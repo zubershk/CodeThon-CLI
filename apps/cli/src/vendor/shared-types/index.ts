@@ -227,7 +227,7 @@ export interface AgentOutput {
 }
 
 // ─── Models / LLM ────────────────────────────────────────────────
-export type ProviderType = 'openai' | 'nvidia' | 'mock';
+export type ProviderType = 'openai' | 'nvidia';
 
 export interface ModelInfo {
   id: string;
@@ -240,15 +240,22 @@ export interface ModelInfo {
 }
 
 export const AVAILABLE_MODELS: ModelInfo[] = [
-  // OpenAI
-  { id: 'gpt-4o', name: 'GPT-4o', provider: 'openai', contextWindow: 128000, maxOutput: 16384, pricing: '$2.50/$10.00', recommended: false },
-  { id: 'gpt-4o-mini', name: 'GPT-4o Mini', provider: 'openai', contextWindow: 128000, maxOutput: 16384, pricing: '$0.15/$0.60', recommended: true },
-  { id: 'o1-mini', name: 'o1 Mini', provider: 'openai', contextWindow: 128000, maxOutput: 65536, pricing: '$3.00/$12.00', recommended: false },
-  { id: 'o3-mini', name: 'o3 Mini', provider: 'openai', contextWindow: 200000, maxOutput: 100000, pricing: '$4.00/$16.00', recommended: false },
-  // NVIDIA
-  { id: 'nvidia/llama-3.3-nemotron-super-49b-v1', name: 'Nemotron Super 49B', provider: 'nvidia', contextWindow: 128000, maxOutput: 8192, pricing: 'Free', recommended: true },
-  { id: 'deepseek-ai/deepseek-v4-flash', name: 'DeepSeek V4 Flash', provider: 'nvidia', contextWindow: 131072, maxOutput: 8192, pricing: 'Free', recommended: false },
+  // NVIDIA (Free, no API key needed)
+  { id: 'deepseek-ai/deepseek-v4-flash', name: 'DeepSeek V4 Flash', provider: 'nvidia', contextWindow: 131072, maxOutput: 8192, pricing: 'Free', recommended: true },
+  { id: 'nvidia/llama-3.3-nemotron-super-49b-v1', name: 'Nemotron Super 49B', provider: 'nvidia', contextWindow: 128000, maxOutput: 8192, pricing: 'Free', recommended: false },
   { id: 'meta/llama-3.1-70b-instruct', name: 'Llama 3.1 70B', provider: 'nvidia', contextWindow: 128000, maxOutput: 4096, pricing: 'Free', recommended: false },
+  // OpenAI (requires OPENAI_API_KEY)
+  { id: 'gpt-5.5', name: 'GPT-5.5', provider: 'openai', contextWindow: 128000, maxOutput: 16384, pricing: 'Check OpenAI pricing', recommended: true },
+  { id: 'gpt-5.5-pro', name: 'GPT-5.5 Pro', provider: 'openai', contextWindow: 128000, maxOutput: 16384, pricing: 'Check OpenAI pricing', recommended: false },
+  { id: 'gpt-5.4', name: 'GPT-5.4', provider: 'openai', contextWindow: 128000, maxOutput: 16384, pricing: 'Check OpenAI pricing', recommended: false },
+  { id: 'gpt-5.4-mini', name: 'GPT-5.4 Mini', provider: 'openai', contextWindow: 128000, maxOutput: 16384, pricing: 'Check OpenAI pricing', recommended: false },
+  { id: 'gpt-5-mini', name: 'GPT-5 Mini', provider: 'openai', contextWindow: 128000, maxOutput: 16384, pricing: 'Check OpenAI pricing', recommended: false },
+  { id: 'gpt-5', name: 'GPT-5', provider: 'openai', contextWindow: 128000, maxOutput: 16384, pricing: 'Check OpenAI pricing', recommended: false },
+  { id: 'gpt-4.1', name: 'GPT-4.1', provider: 'openai', contextWindow: 128000, maxOutput: 16384, pricing: 'Check OpenAI pricing', recommended: false },
+  { id: 'gpt-4o', name: 'GPT-4o', provider: 'openai', contextWindow: 128000, maxOutput: 16384, pricing: '$2.50/$10.00', recommended: false },
+  { id: 'gpt-4o-mini', name: 'GPT-4o Mini', provider: 'openai', contextWindow: 128000, maxOutput: 16384, pricing: '$0.15/$0.60', recommended: false },
+  { id: 'o3', name: 'o3', provider: 'openai', contextWindow: 200000, maxOutput: 100000, pricing: 'Check OpenAI pricing', recommended: false },
+  { id: 'o4-mini', name: 'o4 Mini', provider: 'openai', contextWindow: 200000, maxOutput: 100000, pricing: 'Check OpenAI pricing', recommended: false },
 ];
 
 export interface LLMConfig {

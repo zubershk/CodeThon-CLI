@@ -167,24 +167,18 @@ export async function initCommand(): Promise<CommandResult> {
 
   const openaiModels = AVAILABLE_MODELS.filter((m) => m.provider === 'openai');
   const nvidiaModels = AVAILABLE_MODELS.filter((m) => m.provider === 'nvidia');
-  const mockModel = { id: 'mock', name: 'Mock Provider', provider: 'mock' as ProviderType, contextWindow: 999999, maxOutput: 999999, pricing: 'Free', recommended: false };
 
   const modelChoices = [
-    new inquirer.Separator(chalk.cyan('── OpenAI ──')),
-    ...openaiModels.map((m) => ({
-      name: `  ${formatModelEntry(m)}`,
-      value: m.id,
-    })),
     new inquirer.Separator(chalk.magenta('── NVIDIA (Free, no API key needed) ──')),
     ...nvidiaModels.map((m) => ({
       name: `  ${formatModelEntry(m)}`,
       value: m.id,
     })),
-    new inquirer.Separator(chalk.dim('── Dev ──')),
-    {
-      name: `  Mock Provider  ${chalk.dim('(deterministic, no API key)')}`,
-      value: mockModel.id,
-    },
+    new inquirer.Separator(chalk.cyan('── OpenAI ──')),
+    ...openaiModels.map((m) => ({
+      name: `  ${formatModelEntry(m)}`,
+      value: m.id,
+    })),
   ];
 
   const { selectedModel } = await inquirer.prompt([
@@ -197,8 +191,9 @@ export async function initCommand(): Promise<CommandResult> {
     },
   ]);
 
-  const selectedModelInfo = [...openaiModels, ...nvidiaModels, mockModel].find((m) => m.id === selectedModel);
-  const provider: ProviderType = selectedModel === 'mock' ? 'mock' : (selectedModelInfo?.provider || 'openai');
+  const allModels = [...nvidiaModels, ...openaiModels];
+  const selectedModelInfo = allModels.find((m) => m.id === selectedModel);
+  const provider: ProviderType = selectedModelInfo?.provider || 'nvidia';
   const modelId = selectedModel;
 
   // ── Init Project ──

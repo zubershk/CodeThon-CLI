@@ -16,10 +16,10 @@ const store = new Conf<ConfigSchema>({
   cwd: CONFIG_PATH,
   defaults: {
     llm: {
-      provider: 'mock',
-      model: 'gpt-4o-mini',
+      provider: 'nvidia',
+      model: 'deepseek-ai/deepseek-v4-flash',
       temperature: 0.3,
-      maxTokens: 2048,
+      maxTokens: 4096,
     },
     currentProjectId: null,
     theme: 'dark',
@@ -28,20 +28,16 @@ const store = new Conf<ConfigSchema>({
 
 export function getLLMConfig(): LLMConfig {
   const config = store.get('llm');
-  // Fall back to environment variables for API keys (loaded from .env by dotenv)
-  if (!config.apiKey) {
-    if (config.provider === 'nvidia') {
-      config.apiKey = process.env.NVIDIA_API_KEY || process.env.CODETHON_NVIDIA_KEY || '';
-    } else if (config.provider === 'openai') {
-      config.apiKey = process.env.OPENAI_API_KEY || process.env.CODETHON_OPENAI_KEY || '';
-    }
-  }
-  return config;
+  const apiKey = config.provider === 'nvidia'
+    ? process.env.NVIDIA_API_KEY || process.env.CODETHON_NVIDIA_KEY || ''
+    : process.env.OPENAI_API_KEY || process.env.CODETHON_OPENAI_KEY || '';
+  return { ...config, apiKey };
 }
 
 export function setLLMConfig(config: Partial<LLMConfig>): void {
-  const current = getLLMConfig();
-  store.set('llm', { ...current, ...config });
+  const current = store.get('llm');
+  const { apiKey: _, ...safeConfig } = config;
+  store.set('llm', { ...current, ...safeConfig });
 }
 
 export function getCurrentProjectId(): string | null {

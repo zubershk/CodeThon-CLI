@@ -19,6 +19,7 @@ export interface ToolResult {
   tool: string;
   output: string;
   error?: string;
+  elapsed?: number;
 }
 
 const SKIP_DIRS = new Set([

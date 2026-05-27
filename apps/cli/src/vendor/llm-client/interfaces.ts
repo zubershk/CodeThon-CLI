@@ -32,11 +32,8 @@ export function createProvider(config: LLMConfig): LLMProvider {
       const { OpenAIProvider } = require('./openai-adapter');
       return new OpenAIProvider(config);
     case 'nvidia':
+    default:
       const { NVIDIAProvider } = require('./nvidia-adapter');
       return new NVIDIAProvider(config);
-    case 'mock':
-    default:
-      const { MockProvider } = require('./mock-adapter');
-      return new MockProvider();
   }
 }

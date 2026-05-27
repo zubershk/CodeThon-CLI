@@ -20,3 +20,8 @@ export { autofixCommand } from './autofix';
 export { runCommand } from './run';
 export { naturalLanguageCommand } from './nl';
 export { executeCommand } from './execute';
+export { replCommand } from './repl';
+export { doctorCommand } from './doctor';
+export { explainCommand } from './explain';
+export { summarizeCommand } from './summarize';
+export { recoverCommand } from './recover';

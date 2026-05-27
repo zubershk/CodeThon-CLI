@@ -3,7 +3,7 @@ import type { CommandResult } from '@codethon/shared-types';
 import { BuildEngine } from '../cil/build-engine';
 import { StateManager } from '../cil/state-manager';
 import { logger } from '../utils';
-import { renderAgentOutput } from '../utils/render';
+import { startAgent, succeedAgent, failAgent } from '../utils/agent-feed';
 
 export async function buildCommand(goal?: string): Promise<CommandResult> {
   logger.section('CodeThon CLI — Autonomous Builder');
@@ -21,30 +21,27 @@ export async function buildCommand(goal?: string): Promise<CommandResult> {
 
   try {
     // Step 1: Analyze
-    logger.info(`${chalk.cyanBright('\u25B8')} Step 1/3: Analyzing current project state...\n`);
+    startAgent('Architect', `Analyzing project structure...`);
     const analysis = await engine.analyzeProject();
-    logger.info(`  ${chalk.greenBright('\u2713')} ${analysis.techStack.join(', ') || 'Mixed'} project, ${analysis.structure.length} files found\n`);
+    succeedAgent(`${analysis.techStack.join(', ') || 'Mixed'} project, ${analysis.structure.length} files`);
+
+    console.log('');
 
     // Step 2: Generate & execute build plan with streaming
-    logger.info(`${chalk.cyanBright('\u25B8')} Step 2/3: Generating build plan for: ${chalk.bold.whiteBright(buildGoal)}\n`);
-
-    const result = await engine.build(buildGoal, (token) => {
-      process.stdout.write(token);
-    });
-
-    process.stdout.write('\n');
+    startAgent('Build', `Generating build plan for: ${buildGoal}`);
+    const result = await engine.build(buildGoal, () => {});
+    succeedAgent(`${result.filesWritten} files written, ${result.commandsRun} commands executed`);
 
     // Step 3: Auto-fix
     if (result.errors.length > 0) {
-      logger.info(`${chalk.cyanBright('\u25B8')} Step 3/3: Auto-fixing ${result.errors.length} issues...\n`);
-      const fixResult = await engine.autoFix((token) => {
-        process.stdout.write(token);
-      });
-      process.stdout.write('\n');
-      logger.info(`  ${chalk.greenBright('\u2713')} Fixed ${fixResult.filesFixed} files\n`);
+      startAgent('Debug', `Auto-fixing ${result.errors.length} issues...`);
+      const fixResult = await engine.autoFix(() => {});
+      succeedAgent(`Fixed ${fixResult.filesFixed} files`);
     } else {
-      logger.info(`${chalk.cyanBright('\u25B8')} Step 3/3: No issues to fix\n`);
+      succeedAgent('No issues to fix');
     }
+
+    console.log('');
 
     // Summary
     logger.resultSummary('Build Complete', [
@@ -61,6 +58,7 @@ export async function buildCommand(goal?: string): Promise<CommandResult> {
       data: { goal: buildGoal, result },
     };
   } catch (error) {
+    failAgent(error instanceof Error ? error.message : 'Build failed');
     logger.error(`Build failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     return { success: false, message: 'Build failed' };
   }

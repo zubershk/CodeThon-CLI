@@ -27,17 +27,17 @@ import {
   runCommand,
   naturalLanguageCommand,
   executeCommand,
+  doctorCommand,
+  explainCommand,
+  summarizeCommand,
+  recoverCommand,
 } from './commands';
-import { logger } from './utils';
-import { showStartupTips } from './utils';
+import { logger, showStartupTips } from './utils';
 
 
 dotenv.config();
 
-// Graceful shutdown handler
-const handleExit = () => process.exit(0);
-process.on('SIGINT', handleExit);
-process.on('SIGTERM', handleExit);
+process.on('SIGTERM', () => process.exit(0));
 
 const program = new Command();
 
@@ -340,23 +340,76 @@ program
     }
   });
 
-// Show startup tips if no command
-if (process.argv.length < 3) {
-  showStartupTips();
-  process.exit(0);
-}
+program
+  .command('doctor')
+  .description('Run project diagnostics — checks Node, deps, env, config, TypeScript')
+  .action(async () => {
+    try {
+      const result = await doctorCommand();
+      if (program.getOptionValue('output') === 'json') console.log(JSON.stringify(result, null, 2));
+    } catch (error) {
+      logger.error(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      process.exit(1);
+    }
+  });
 
-// Natural language fallback — check before Commander parses
-const knownCommands = program.commands.map(c => c.name());
-const firstArg = process.argv[2];
-const isKnown = knownCommands.includes(firstArg || '');
+program
+  .command('explain')
+  .description('Analyze and explain any file in the project')
+  .argument('<file>', 'path to the file to explain')
+  .action(async (file: string) => {
+    try {
+      const result = await explainCommand(file);
+      if (program.getOptionValue('output') === 'json') console.log(JSON.stringify(result, null, 2));
+    } catch (error) {
+      logger.error(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      process.exit(1);
+    }
+  });
 
-if (firstArg && !isKnown && !firstArg.startsWith('-')) {
-  // Route directly to NL handler before Commander prints its error
-  naturalLanguageCommand(process.argv.slice(2).join(' '));
-} else {
-  program.exitOverride();
-  (async () => {
+program
+  .command('summarize')
+  .description('Generate a structured project status summary')
+  .action(async () => {
+    try {
+      const result = await summarizeCommand();
+      if (program.getOptionValue('output') === 'json') console.log(JSON.stringify(result, null, 2));
+    } catch (error) {
+      logger.error(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      process.exit(1);
+    }
+  });
+
+program
+  .command('recover')
+  .description('Scan repo, rebuild context, restore execution awareness')
+  .action(async () => {
+    try {
+      const result = await recoverCommand();
+      if (program.getOptionValue('output') === 'json') console.log(JSON.stringify(result, null, 2));
+    } catch (error) {
+      logger.error(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      process.exit(1);
+    }
+  });
+
+(async () => {
+  // Launch REPL if no command
+  if (process.argv.length < 3) {
+    const { replCommand } = await import('./commands/repl');
+    await replCommand();
+    return;
+  }
+
+  // Natural language fallback — check before Commander parses
+  const knownCommands = program.commands.map(c => c.name());
+  const firstArg = process.argv[2];
+  const isKnown = knownCommands.includes(firstArg || '');
+
+  if (firstArg && !isKnown && !firstArg.startsWith('-')) {
+    await naturalLanguageCommand(process.argv.slice(2).join(' '));
+  } else {
+    program.exitOverride();
     try {
       program.parse(process.argv);
     } catch (e: any) {
@@ -372,5 +425,5 @@ if (firstArg && !isKnown && !firstArg.startsWith('-')) {
         process.exit(1);
       }
     }
-  })();
-}
+  }
+})();
