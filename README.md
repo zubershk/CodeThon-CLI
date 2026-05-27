@@ -10,7 +10,7 @@ npx codethon-cli init
 
 ## Why CodeThon CLI?
 
-Most AI coding tools are **chatbots** — you describe what you want, copy the code, paste it, run the build, copy errors back, repeat. CodeThon CLI is different.
+Most AI coding tools are **chatbots**, you describe what you want, copy the code, paste it, run the build, copy errors back, repeat. CodeThon CLI is different.
 
 | Other tools | CodeThon CLI |
 |---|---|
@@ -18,7 +18,6 @@ Most AI coding tools are **chatbots** — you describe what you want, copy the c
 | You manually run build → copy errors | CLI **auto-fixes build errors** |
 | You switch tabs to search docs | CLI **searches the web for you** |
 | You approve every single step | CLI **loops autonomously until done** |
-| Requires API key setup | **Works immediately** (free NVIDIA models) |
 | Generic chat interface | **Hackathon-tailored** (24h/48h/72h timelines) |
 
 **CodeThon CLI is an autonomous engineering agent that lives in your terminal.** It reads your codebase, writes files, runs commands, searches the web, and fixes its own mistakes — all in a secure, approval-gated execution loop.
@@ -58,9 +57,55 @@ cd my-app
 ct execute "add a signup page with email authentication"
 ```
 
-### No API key? No problem.
+---
 
-When the model selector appears, choose any NVIDIA model — they require **no API key** and work immediately.
+## Live Agent Activity Feed
+
+Long-running operations show **live agent status** instead of boring spinners:
+
+```
+[Architect Agent] Analyzing project structure...
+[Build Agent] Generating build plan for: landing page with auth
+[Debug Agent] Auto-fixing 3 issues...
+[Build Agent] ✔ 5 files written, 2 commands executed
+```
+
+Each agent has its own color:
+- `[PM Agent]` → green — planning
+- `[Architect Agent]` → magenta — architecture
+- `[Build Agent]` → cyan — building
+- `[Debug Agent]` → yellow — debugging
+- `[Deploy Agent]` → blue — deployment
+- `[Research Agent]` → white — web search
+
+---
+
+## Interactive REPL Mode
+
+Running `ct` with no arguments launches a **persistent execution-aware REPL**:
+
+```
+CodeThon >
+```
+
+Inside the REPL, you can:
+
+- Type any **natural language question** — automatically searches the web and crawls URLs
+- Use **slash commands** — `/help`, `/status`, `/doctor`, `/summarize`, `/review`, `/diff`, `/clear`, `/exit`
+- Navigate with **arrow keys** through command history
+- Use **tab completion** for slash commands
+
+The REPL shows a **context banner** at the top with your project name, stack, phase, health score, and AI model — so you always know where things stand.
+
+```
+  ────────────────────────────────────────────────────────
+  Project: AI SaaS  ┃  Stack: Next.js + Supabase  ┃  Phase: Building  ┃  Health: 82%  ┃  Model: gpt-4o
+  ────────────────────────────────────────────────────────
+
+CodeThon > fix the login page
+```
+
+This turns the CLI into a **persistent, conversational execution teammate** — not a one-shot command runner.
 
 ---
 
@@ -104,6 +149,46 @@ When the model selector appears, choose any NVIDIA model — they require **no A
 | `ct emergency` | Demo-day crisis mode: describe the crash, get recovery steps |
 | `ct diff` | Full `git diff` with syntax-colored output |
 | `ct review` | Quick `git diff --stat` overview of changed files |
+
+### Intelligence & Recovery
+
+| Command | What it does |
+|---|---|
+| `ct doctor` | Run full project diagnostics — checks Node version, package.json, dependencies, env vars, config files, TypeScript errors |
+| `ct explain <file>` | AI-powered code analysis — explains purpose, architecture role, risks, and optimization ideas for any file |
+| `ct summarize` | Generate structured project status with blockers, next priorities, readiness score, and recommended next command |
+| `ct recover` | Scan repository, rebuild project context, detect broken state, reconstruct roadmap and execution awareness |
+
+All four use the **Agent Activity Feed** with dedicated agents:
+```
+[Doctor Agent] Running project diagnostics...
+[Architect Agent] Analyzing src/api/auth.ts...
+[PM Agent] Generating project summary...
+```
+
+### Phase 4: Auto-Saved Outputs
+
+Every major command auto-saves structured reports to `.codethon/`:
+
+```
+.codethon/
+├── planning/
+│   ├── roadmap-2026-05-27.md
+│   └── architecture-2026-05-27.md
+├── debug-reports/
+│   └── debug-2026-05-27.md
+├── launch-assets/
+│   └── launch-2026-05-27.md
+├── sessions/
+│   └── session-2026-05-27.md
+└── reports/
+    ├── health-2026-05-27.md
+    └── recovery-2026-05-27.md
+```
+
+Run `ct status` to see a summary of all saved outputs.
+
+---
 
 ### Natural Language
 
@@ -252,13 +337,12 @@ The starter project includes a full working dashboard UI:
 
 ### AI Models
 
-The CLI supports three providers:
+The CLI supports two providers:
 
 | Provider | API Key Required | Models |
 |---|---|---|
-| **NVIDIA** | No (free!) | DeepSeek-V4-Flash, Llama 3.3 Nemotron, Llama 3.1 70B |
-| **OpenAI** | Yes (`OPENAI_API_KEY`) | GPT-4o, GPT-4o-mini, GPT-4-turbo |
-| **Mock** | No | Dev-only placeholder (no real AI) |
+| **NVIDIA** (default) | Yes (`NVIDIA_API_KEY`) | DeepSeek V4 Flash, Nemotron Super 49B, Llama 3.1 70B |
+| **OpenAI** | Yes (`OPENAI_API_KEY`) | GPT-5.5, GPT-5.4, GPT-5.4 Mini, GPT-5 Mini, GPT-5, GPT-4.1, GPT-4o, GPT-4o Mini, o3, o4 Mini |
 
 Switch models anytime:
 
@@ -345,8 +429,8 @@ src/
 
 ```bash
 # Clone and install
-git clone https://github.com/your-org/codethon-cli
-cd codethon-cli/apps/cli
+git clone https://github.com/zubershk/CodeThon-CLI
+cd CodeThon-CLI/apps/cli
 npm install
 
 # Build
