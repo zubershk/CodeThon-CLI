@@ -1,0 +1,52 @@
+# Dependencies
+node_modules/
+apps/cli/node_modules/
+.pnpm-store/
+.npm/
+
+# Build output
+dist/
+build/
+out/
+.next/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# OS
+.DS_Store
+Thumbs.db
+*.log
+
+# TypeScript
+*.tsbuildinfo
+*.tsbuildinfo.*
+
+# Runtime
+logs/
+
+# Project stores (user data — don't commit)
+.codethon/
+
+# Temp
+tmp/
+temp/
+*.bak
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Vendor (copied from packages, not edited directly)
+src/vendor/
