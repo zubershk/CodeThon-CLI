@@ -54,7 +54,7 @@ export default function Home() {
             Built during the OpenAI × Outskill AI Builders Hackathon
           </p>
           <div className="mt-6 flex items-center justify-center gap-6 text-xs text-[#8888a0]/40">
-            <a href="https://github.com/zuberfx/CodeThon-CLI" target="_blank" rel="noopener noreferrer" className="hover:text-cyan-400 transition-colors">GitHub</a>
+            <a href="https://github.com/zubershk/CodeThon-CLI" target="_blank" rel="noopener noreferrer" className="hover:text-cyan-400 transition-colors">GitHub</a>
             <span>MIT License</span>
             <span>v2.0</span>
           </div>
