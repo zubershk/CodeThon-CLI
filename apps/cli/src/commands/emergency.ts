@@ -41,6 +41,7 @@ export async function emergencyCommand(): Promise<CommandResult> {
     project.blockers.push({
       description: `Emergency: ${output.summary}`,
       severity: 'critical',
+      category: 'unknown',
       timestamp: new Date().toISOString(),
       resolved: false,
     });

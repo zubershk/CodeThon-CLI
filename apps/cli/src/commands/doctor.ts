@@ -104,7 +104,7 @@ function checkConfigFiles(): DoctorCheck[] {
   if (found.length > 0) {
     checks.push({ name: 'Config Files', status: 'pass', message: found.join(', ') });
   } else {
-    checks.push({ name: 'Config Files', status: 'info', message: 'No framework configs detected' });
+    checks.push({ name: 'Config Files', status: 'warn', message: 'No framework configs detected' });
   }
   return checks;
 }

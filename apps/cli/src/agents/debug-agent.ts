@@ -23,11 +23,13 @@ export class DebugAgent extends BaseAgent {
       recoverySteps: [],
       commands: [],
       severity: this.detectSeverity(errorInput),
+      resolved: false,
     });
 
     project.blockers.push({
       description: output.summary || 'Debug session recorded',
       severity: 'high',
+      category: 'unknown',
       timestamp: new Date().toISOString(),
       resolved: false,
     });

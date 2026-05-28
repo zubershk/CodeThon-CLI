@@ -32,8 +32,14 @@ import {
   explainCommand,
   summarizeCommand,
   recoverCommand,
+  gitCommand,
+  testGenCommand,
+  profileCommand,
+  checkpointCommand,
+  onboardCommand,
 } from './commands';
 import { logger, showStartupTips } from './utils';
+import { GracefulShutdown } from './features/recovery';
 
 
 import fs from 'fs';
@@ -57,17 +63,10 @@ function loadDotenvChain(startDir: string): void {
 }
 loadDotenvChain(process.cwd());
 
-process.on('SIGTERM', () => process.exit(0));
-
-process.on('unhandledRejection', (reason: unknown) => {
-  const msg = reason instanceof Error ? reason.message : String(reason);
-  process.stderr.write(`\n  \u2717 Unhandled Rejection: ${msg}\n`);
-  process.exit(1);
-});
-
-process.on('uncaughtException', (error: Error) => {
-  process.stderr.write(`\n  \u2717 Uncaught Exception: ${error.message}\n`);
-  process.exit(1);
+const shutdown = new GracefulShutdown();
+shutdown.onShutdown(async () => {
+  // Flush logs before exit
+  process.stdout.write('\n');
 });
 
 const program = new Command();
@@ -448,6 +447,77 @@ program
     }
   });
 
+program
+  .command('git')
+  .description('Git integration — status, diff, commit suggestions, review, PR')
+  .argument('[subcommand]', 'status|diff|suggest|review|pr|branch')
+  .argument('[args...]', 'additional arguments')
+  .action(async (subcommand?: string, extras?: string[]) => {
+    try {
+      const result = await gitCommand(subcommand || '', ...(extras || []));
+      if (program.getOptionValue('output') === 'json') console.log(JSON.stringify(result, null, 2));
+    } catch (error) {
+      logger.error(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      process.exit(1);
+    }
+  });
+
+program
+  .command('test')
+  .description('Test agent — generate tests, analyze coverage, mutation testing')
+  .argument('[subcommand]', 'status|generate|generate-all|coverage|mutate')
+  .argument('[args...]', 'file path or directory')
+  .action(async (subcommand?: string, extras?: string[]) => {
+    try {
+      const result = await testGenCommand(subcommand || '', ...(extras || []));
+      if (program.getOptionValue('output') === 'json') console.log(JSON.stringify(result, null, 2));
+    } catch (error) {
+      logger.error(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      process.exit(1);
+    }
+  });
+
+program
+  .command('profile')
+  .description('Profile project — detect N+1 queries, memory leaks, bundle size, code smells')
+  .action(async () => {
+    try {
+      const result = await profileCommand();
+      if (program.getOptionValue('output') === 'json') console.log(JSON.stringify(result, null, 2));
+    } catch (error) {
+      logger.error(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      process.exit(1);
+    }
+  });
+
+program
+  .command('checkpoint')
+  .description('Recovery points — save and restore project state snapshots')
+  .argument('[subcommand]', 'list|save|restore')
+  .argument('[args...]', 'description or restore ID')
+  .action(async (subcommand?: string, extras?: string[]) => {
+    try {
+      const result = await checkpointCommand(subcommand || '', ...(extras || []));
+      if (program.getOptionValue('output') === 'json') console.log(JSON.stringify(result, null, 2));
+    } catch (error) {
+      logger.error(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      process.exit(1);
+    }
+  });
+
+program
+  .command('onboard')
+  .description('First-time setup wizard — configure API keys and theme')
+  .action(async () => {
+    try {
+      const result = await onboardCommand();
+      if (program.getOptionValue('output') === 'json') console.log(JSON.stringify(result, null, 2));
+    } catch (error) {
+      logger.error(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      process.exit(1);
+    }
+  });
+
 (async () => {
   // Show splash on no-args or known commands
   const { showSplash, showMiniSplash } = await import('./utils/splash');
@@ -484,6 +554,7 @@ program
     try {
       program.parse(process.argv);
     } catch (e: any) {
+      // Commander throws on --version/--help/unknown-command with exitOverride
       if (e.code === 'commander.unknownCommand') {
         const rawArgs = process.argv.slice(2).join(' ');
         if (rawArgs.trim()) {
@@ -491,6 +562,9 @@ program
         } else {
           showStartupTips();
         }
+      } else if (e.exitCode === 0) {
+        // --version or --help — clean exit, already printed
+        process.exit(0);
       } else {
         logger.error(`Error: ${e instanceof Error ? e.message : 'Unknown error'}`);
         process.exit(1);

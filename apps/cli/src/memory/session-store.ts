@@ -19,6 +19,7 @@ export function addBlocker(description: string, severity: 'low' | 'medium' | 'hi
   project.blockers.push({
     description,
     severity,
+    category: 'unknown',
     timestamp: new Date().toISOString(),
     resolved: false,
   });

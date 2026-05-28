@@ -55,14 +55,14 @@ export class StateManager {
     const project = this.getProjectOrThrow();
     project.roadmap = roadmap;
     project.sprintPhase = 'planning';
-    this.emitEvent(project, 'roadmap_generated', `Roadmap with ${roadmap.milestones.length} milestones`);
+    this.emitEvent(project, 'roadmap_generated', `Roadmap with ${(roadmap?.milestones || []).length} milestones`);
     saveProject(project);
   }
 
   saveArchitecture(architecture: ProjectState['architecture']): void {
     const project = this.getProjectOrThrow();
     project.architecture = architecture;
-    this.emitEvent(project, 'architecture_generated', `Architecture designed for ${(architecture.stack || []).join(', ')}`);
+    this.emitEvent(project, 'architecture_generated', `Architecture designed for ${(architecture?.stack || []).join(', ')}`);
     saveProject(project);
   }
 

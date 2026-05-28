@@ -1,0 +1,10 @@
+export { GitIntegration } from './git-integration';
+export type { CommitSuggestion, PRInfo, ReviewComment } from './git-integration';
+export { TestAgent } from './test-agent';
+export type { TestGenerationResult, TestCoverageReport } from './test-agent';
+export { ProfilerAgent } from './profiler-agent';
+export type { PerformanceFinding, CodeSmellFinding } from './profiler-agent';
+export { RecoverySystem, GracefulShutdown } from './recovery';
+export type { RecoveryPoint } from './recovery';
+export { OnboardingWizard } from './onboarding';
+export type { OnboardingState } from './onboarding';

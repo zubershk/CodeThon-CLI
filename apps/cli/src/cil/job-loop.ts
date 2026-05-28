@@ -1,5 +1,5 @@
-import { createProvider } from '@codethon/llm-client';
-import type { LLMProvider, LLMMessage } from '@codethon/llm-client';
+import { createProvider, LLMRouter, CostTracker } from '../llm/index';
+import type { LLMProvider, LLMMessage } from '../llm/index';
 import { getLLMConfig } from '../utils/config';
 import { ToolExecutor } from './tools';
 import type { ToolCall, ToolResult } from './tools';
@@ -69,12 +69,29 @@ export class JobLoop {
   private readonly COMPACT_THRESHOLD = 20;
   private goal = '';
   private checkpointPath = '';
+  private router: LLMRouter | null = null;
+  private costTracker: CostTracker | null = null;
+  private useFallback: boolean;
 
-  constructor(projectRoot: string, maxIterations = 20, askMode = false, dryRun = false) {
-    const config = getLLMConfig();
-    this.provider = createProvider(config);
+  constructor(projectRoot: string, maxIterations = 20, askMode = false, dryRun = false, useFallback = false) {
+    this.useFallback = useFallback;
     this.executor = new ToolExecutor(projectRoot, askMode, dryRun);
     this.maxIterations = maxIterations;
+
+    if (useFallback) {
+      this.router = new LLMRouter();
+      this.costTracker = new CostTracker();
+      this.provider = null as unknown as LLMProvider;
+    } else {
+      const config = getLLMConfig();
+      this.provider = createProvider({
+        provider: config.provider as any,
+        modelId: config.model || 'gpt-4o-mini',
+        apiKey: config.apiKey,
+        temperature: config.temperature,
+        maxTokens: config.maxTokens,
+      });
+    }
   }
 
   private async withRetry<T>(fn: () => Promise<T>, _label: string, retries = 2): Promise<T> {
@@ -338,6 +355,26 @@ export class JobLoop {
   }
 
   private async generateWithStream(onToken?: (token: string) => void): Promise<string> {
+    if (this.useFallback && this.router) {
+      const result = await this.router.callWithFallback(
+        this.conversation.map(m => `${m.role}: ${m.content}`).join('\n'),
+        this.conversation.length > 10 ? 'code-generation' : 'analysis',
+        this.conversation.find(m => m.role === 'system')?.content,
+      );
+
+      if (this.costTracker) {
+        const tokens = Math.ceil(result.response.length / 4);
+        this.costTracker.recordUsage(result.model, result.providerName, tokens, tokens, 0);
+      }
+
+      if (onToken) {
+        for (const char of result.response) {
+          onToken(char);
+        }
+      }
+      return result.response;
+    }
+
     if (onToken && this.provider.stream) {
       let content = '';
       const stream = this.provider.stream({

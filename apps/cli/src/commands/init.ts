@@ -42,7 +42,7 @@ export async function initCommand(): Promise<CommandResult> {
           { name: '  Select existing project', value: 'select' },
           new inquirer.Separator(),
           ...existing.map((p) => ({
-            name: `  ${p.name || p.idea}`,
+            name: `  ${p.name}`,
             value: p.id,
           })),
         ],
@@ -74,7 +74,7 @@ export async function initCommand(): Promise<CommandResult> {
           message: 'Select a project:',
           pageSize: 12,
           choices: existing.map((p) => ({
-            name: `  ${p.name || p.idea}`,
+            name: `  ${p.name}`,
             value: p.id,
           })),
         },
