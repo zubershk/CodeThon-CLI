@@ -1,28 +1,43 @@
 {
   "name": "codethon-cli",
-  "version": "0.1.0",
-  "description": "AI-native execution orchestration for hackathons — ship products in record time",
+  "version": "0.2.0",
+  "description": "AI-native execution orchestration for developers and hackathon builders — plan, build, debug, and ship from your terminal.",
   "bin": {
     "ct": "dist/index.js"
   },
   "preferGlobal": true,
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
   "files": [
-    "dist",
-    "README.md"
+    "dist/index.js",
+    "dist/index.d.ts",
+    "README.md",
+    "LICENSE"
   ],
+  "sideEffects": false,
   "engines": {
     "node": ">=18.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
+    "start": "node dist/index.js",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "lint": "eslint src --ext .ts",
-    "clean": "rm -rf dist"
+    "prepublishOnly": "npm run build && npm run typecheck",
+    "prepack": "npm run build"
   },
   "dependencies": {
     "chalk": "^5.3.0",
@@ -41,5 +56,34 @@
     "tsup": "^8.5.1",
     "typescript": "^5.4.0",
     "vitest": "^1.6.0"
+  },
+  "keywords": [
+    "cli",
+    "ai",
+    "hackathon",
+    "developer-tools",
+    "terminal",
+    "autonomous",
+    "agent",
+    "code-generation",
+    "devops",
+    "productivity"
+  ],
+  "homepage": "https://github.com/zubershk/CodeThon-CLI#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zubershk/CodeThon-CLI.git"
+  },
+  "bugs": {
+    "url": "https://github.com/zubershk/CodeThon-CLI/issues"
+  },
+  "author": {
+    "name": "Zuber",
+    "url": "https://github.com/zubershk"
+  },
+  "license": "MIT",
+  "funding": {
+    "type": "github",
+    "url": "https://github.com/sponsors/zubershk"
   }
 }

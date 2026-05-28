@@ -1,18 +1,14 @@
 {
-  "name": "codethon-cli",
+  "name": "codethon-cli-workspace",
   "version": "0.2.0",
   "private": true,
   "description": "CodeThon CLI — AI-native execution orchestration for hackathons",
-  "bin": {
-    "ct": "apps/cli/dist/index.js"
-  },
-  "preferGlobal": true,
   "scripts": {
-    "build": "cd apps/cli && npx tsup",
+    "build": "cd apps/cli && npm run build",
     "start": "node apps/cli/dist/index.js",
-    "dev": "cd apps/cli && npx tsup --watch",
-    "test": "cd apps/cli && npx vitest run",
-    "test:watch": "cd apps/cli && npx vitest",
+    "dev": "cd apps/cli && npm run dev",
+    "test": "cd apps/cli && npm test",
+    "test:watch": "cd apps/cli && npm run test:watch",
     "clean": "if (Test-Path apps/cli/dist) { Remove-Item -Recurse -Force apps/cli/dist }",
     "postinstall": "cd apps/cli && npm install"
   },

@@ -23,6 +23,7 @@ out/
 *~
 .DS_Store
 Thumbs.db
+AGENTS.md
 
 # OS
 .DS_Store
@@ -50,4 +51,8 @@ coverage/
 
 # Vendor (copied from packages, not edited directly)
 src/vendor/
-AGENTS.md
+
+# Website (separate deployment)
+website/.next/
+website/node_modules/
+website/out/

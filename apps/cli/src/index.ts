@@ -74,7 +74,7 @@ const program = new Command();
 program
   .name('ct')
   .description('CodeThon CLI — AI-native execution orchestration for hackathons')
-  .version('0.1.0')
+  .version('0.2.0')
   .option('--debug', 'enable verbose debug output')
   .option('-o, --output <format>', 'output format (text|json)', 'text')
   .option('-a, --ask', 'require approval before running commands or modifying files')
