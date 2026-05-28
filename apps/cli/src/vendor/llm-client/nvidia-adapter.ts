@@ -101,4 +101,12 @@ export class NVIDIAProvider implements LLMProvider {
       }
     }
   }
+
+  countTokens(text: string): number {
+    return Math.ceil(text.length / 4);
+  }
+
+  getCost(_inputTokens: number, _outputTokens: number): number {
+    return 0;
+  }
 }

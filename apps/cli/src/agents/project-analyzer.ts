@@ -153,7 +153,7 @@ Be precise and actionable.`;
     return { name, techStack, entryPoints, missingFiles, issues, structure, summary };
   }
 
-  private detectTechStack(keyFiles: Map<string, string>): string[] {
+  detectTechStack(keyFiles: Map<string, string>): string[] {
     const stack: string[] = [];
     if (!keyFiles.has('package.json')) return stack;
 

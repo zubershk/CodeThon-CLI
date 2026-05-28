@@ -55,7 +55,8 @@ export type EventType =
   | 'health_recalculated'
   | 'feedback_recorded'
   | 'command_executed'
-  | 'agent_zero_connected';
+  | 'agent_zero_connected'
+  | 'recovery';
 
 // ─── Feedback ────────────────────────────────────────────────────
 export interface FeedbackEntry {
@@ -234,7 +235,7 @@ export interface AgentOutput {
 }
 
 // ─── Models / LLM ────────────────────────────────────────────────
-export type ProviderType = 'openai' | 'nvidia';
+export type ProviderType = 'openai' | 'nvidia' | 'anthropic' | 'groq' | 'deepseek' | 'together' | 'ollama' | 'local-server';
 
 export interface ModelInfo {
   id: string;

@@ -18,6 +18,7 @@ export class PMAgent extends BaseAgent {
     project.roadmap = {
       milestones: [],
       overview: output.summary,
+      generatedAt: new Date().toISOString(),
     };
     this.state.saveRoadmap(project.roadmap);
     return output;

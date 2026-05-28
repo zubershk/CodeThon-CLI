@@ -17,22 +17,35 @@ export async function analyzeCommand(targetDir?: string): Promise<CommandResult>
     scanDir = path.resolve(targetDir);
   } else {
     const cwd = process.cwd();
-    // Look for scaffolded project subdirectories
-    const entries = fs.readdirSync(cwd, { withFileTypes: true });
-    const projectDirs = entries.filter(e =>
-      e.isDirectory() &&
-      !e.name.startsWith('.') &&
-      ![
-        'node_modules', '.git', 'dist', 'build', 'out', '.next', '.nuxt',
-        '__pycache__', '.venv', 'venv', '.cache', 'coverage',
-        '.turbo', '.nx', '.vscode', '.idea',
-      ].includes(e.name)
-    );
-    // If there's exactly one non-CLI project dir, use it
-    if (projectDirs.length === 1) {
-      scanDir = path.join(cwd, projectDirs[0].name);
-    } else {
+    // If cwd already has project markers, stay at cwd
+    const projectMarkers = [
+      'package.json', 'tsconfig.json', 'Cargo.toml', 'go.mod',
+      'pyproject.toml', 'requirements.txt', 'Gemfile',
+      'Dockerfile', 'Makefile', '.editorconfig',
+    ];
+    const hasMarker = projectMarkers.some(m => fs.existsSync(path.join(cwd, m)));
+
+    if (hasMarker) {
       scanDir = cwd;
+    } else {
+      // Look for scaffolded project subdirectories
+      const entries = fs.readdirSync(cwd, { withFileTypes: true });
+      const projectDirs = entries.filter(e =>
+        e.isDirectory() &&
+        !e.name.startsWith('.') &&
+        ![
+          'node_modules', '.git', 'dist', 'build', 'out', '.next', '.nuxt',
+          '__pycache__', '.venv', 'venv', '.cache', 'coverage',
+          '.turbo', '.nx', '.vscode', '.idea',
+          'apps', 'packages', 'libs', 'modules', 'services',
+        ].includes(e.name)
+      );
+      // If there's exactly one non-CLI project dir, use it
+      if (projectDirs.length === 1) {
+        scanDir = path.join(cwd, projectDirs[0].name);
+      } else {
+        scanDir = cwd;
+      }
     }
   }
 
@@ -112,7 +125,7 @@ export async function analyzeCommand(targetDir?: string): Promise<CommandResult>
     return {
       success: true,
       message: 'Analysis complete',
-      data: analysis,
+      data: analysis as unknown as Record<string, unknown>,
     };
   } catch (error) {
     logger.error(`Analysis failed: ${error instanceof Error ? error.message : 'Unknown error'}`);

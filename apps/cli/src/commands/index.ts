@@ -26,3 +26,8 @@ export { doctorCommand } from './doctor';
 export { explainCommand } from './explain';
 export { summarizeCommand } from './summarize';
 export { recoverCommand } from './recover';
+export { gitCommand } from './git';
+export { testGenCommand } from './test-gen';
+export { profileCommand } from './profile';
+export { checkpointCommand } from './checkpoint';
+export { onboardCommand } from './onboard';

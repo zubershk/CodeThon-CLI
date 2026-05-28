@@ -91,11 +91,11 @@ Inside the REPL, you can:
 
 - Type any **natural language question** — automatically searches the web and crawls URLs
 - Use **slash commands** — `/help` (categorized), `/plan`, `/status`, `/doctor`, `/summarize`, `/review`, `/diff`, `/run`, `/clear`, `/exit`, plus all 27 CLI commands
-- Navigate with **arrow keys** through command history (200-entry ring buffer)
+- **Live suggestion dropdown** — type `/` followed by partial letters to see a fuzzy-matched inline box of up to 10 matching commands. Navigate with **up/down arrows**, Tab to cycle, Enter to select
+- Navigate with **arrow keys** through command history (200-entry ring buffer) when no suggestions are active
 - **Multi-line input** — Shift+Enter for newline, Enter to submit
-- **Tab completion** for slash commands
 
-The REPL shows a **context banner** at the top with your project name, stack, phase, health score, and AI model — so you always know where things stand. The REPL uses a raw-mode keypress handler for precise cursor control.
+The REPL shows a **context banner** at the top with your project name, stack, phase, health score, and AI model — so you always know where things stand. The REPL uses a raw-mode keypress handler for precise cursor control and ANSI escape sequences for stable in-place rendering.
 
 ```
   ────────────────────────────────────────────────────────
@@ -356,22 +356,57 @@ The starter project includes a full working dashboard UI:
 
 ---
 
-## Configuration
+### Multi-LLM Router
 
-### AI Models
+The CLI includes a **smart multi-provider routing layer** that auto-detects available models and falls back gracefully:
 
-The CLI supports two providers:
-
-| Provider | API Key Required | Models |
+| Provider | API Key | Models |
 |---|---|---|
-| **NVIDIA** (default) | Yes (`NVIDIA_API_KEY`) | DeepSeek V4 Flash, Nemotron Super 49B, Llama 3.1 70B |
-| **OpenAI** | Yes (`OPENAI_API_KEY`) | GPT-5.5, GPT-5.4, GPT-5.4 Mini, GPT-5 Mini, GPT-5, GPT-4.1, GPT-4o, GPT-4o Mini, o3, o4 Mini |
+| **NVIDIA** (default) | `NVIDIA_API_KEY` (or `nvapi-*` in `OPENAI_API_KEY`) | DeepSeek V4 Flash (131K ctx), Nemotron Super 49B, Llama 3.1 70B |
+| **OpenAI** | `OPENAI_API_KEY` | GPT-4o, GPT-4o Mini, o3, o4 Mini |
+| **Anthropic** | `ANTHROPIC_API_KEY` | Claude 3.5 Sonnet, Claude 3.5 Haiku, Claude 3 Opus |
+| **Groq** (free) | `GROQ_API_KEY` | Mixtral 8x7B, Llama 3.3 70B, Llama 3.1 8B, Gemma 2 9B |
+| **DeepSeek** | `DEEPSEEK_API_KEY` | DeepSeek Chat, DeepSeek Reasoner |
+| **Together** | `TOGETHER_API_KEY` | Llama 3.3 70B, Mixtral 8x22B |
+| **Ollama** (local) | None | Any locally running model |
+| **LocalServer** (local) | None | LM Studio, LocalAI, any OpenAI-compatible server |
+
+Features:
+- **Auto-detect** — checks all env vars on startup, pings local servers (Ollama/LM Studio/LocalAI)
+- **Use-case ranking** — `rankModelsByUseCase()` reorders by `quick` / `code-generation` / `analysis` / `research` priority maps
+- **Fallback chain** — `LLMRouter.callWithFallback()` tries providers in priority order on failure
+- **Cost tracking** — `CostTracker` records per-model token costs with $/1M-token pricing
+- **LLM cache** — `LLMCache` caches responses by prompt hash (configurable TTL)
+- **Token counter** — estimates token counts per provider/model
 
 Switch models anytime:
 
 ```bash
 ct model
 ```
+
+### Rich Terminal UI Layer
+
+The CLI uses a custom **double-buffered terminal renderer** instead of raw `chalk`:
+
+- **`TerminalRenderer`** — RGB color engine with dirty-cell diffing, box-drawing utilities, ANSI-safe width calculation
+- **`Animations`** — thinking pulse, wave, explosion, shake effects for agent status indicators
+- **`AgentVisualizer`** — multi-panel layout showing agent name, status, step count, and streaming output
+- **`StreamingRenderer`** — token-by-token output with syntax highlighting (TypeScript, Python, JSX, JSON, YAML)
+- **`Theme`** — dark/light mode, gradient generation, ANSI escape helpers for consistent styling
+- **`LayoutEngine`** — dynamic terminal layout with header, main, and footer regions
+- **`KeyBindingManager`** — configurable key bindings for REPL navigation
+
+### Advanced Features
+
+| Feature | Description |
+|---|---|
+| **`GitIntegration`** | AI commit messages (`/review`), PR creation, code review summaries, branch naming |
+| **`TestAgent`** | Auto-generate tests for 6 frameworks (Jest, Vitest, Mocha, Pytest, Go test, Rust test), run mutation testing, coverage analysis |
+| **`ProfilerAgent`** | Detect N+1 queries, unoptimized React re-renders, memory leaks, dead code, bundle size regressions, code smells |
+| **`RecoverySystem`** | Time-travel restore points — snapshot project state before destructive operations, rollback on failure |
+| **`OnboardingWizard`** | First-time setup flow — API key configuration, model selection, project import |
+| **`GracefulShutdown`** | Cleanup handlers for SIGTERM/SIGINT, save checkpoint before exit |
 
 ### Environment Variables
 
@@ -431,7 +466,7 @@ src/
 │   ├── scaffold.ts          # Starter project generator (4 templates, --template flag)
 │   ├── emergency.ts         # Demo-day crisis mode
 │   ├── deploy.ts            # Real Vercel deployment (auto-installs CLI, deploys, captures URL)
-│   ├── repl.ts              # Interactive REPL (raw-mode keypress, multi-line, categorized /help)
+│   ├── repl.ts              # Interactive REPL (raw-mode keypress, suggestion box, multi-line)
 │   ├── run.ts               # Shell command runner with live streaming terminal preview
 │   └── ...                  # roadmap, architect, launch, etc. (27 total)
 ├── cil/                     # Core intelligence layer
@@ -440,6 +475,28 @@ src/
 │   ├── build-engine.ts      # Three-stage build pipeline (targeted autofix edits)
 │   ├── state-manager.ts     # Project state CRUD with event history
 │   └── health-score.ts      # 6-dimension health calculator
+├── llm/                     # Multi-LLM router
+│   ├── providers/           # 7 provider implementations (OpenAI, Anthropic, Groq, DeepSeek, Together, Ollama, LocalServer)
+│   ├── llm-router.ts        # Auto-detect + fallback chain + smart model selection
+│   ├── auto-detect.ts       # Model catalog, env-var detection, local server pinging
+│   ├── cost-tracker.ts      # Per-model token cost tracking
+│   ├── llm-cache.ts         # Response cache by prompt hash (configurable TTL)
+│   └── token-counter.ts     # Provider-aware token estimation
+├── ui/                      # Terminal UI layer
+│   ├── TerminalRenderer.ts  # Double-buffered RGB renderer with dirty-cell diffing
+│   ├── Animations.ts        # Thinking pulse, wave, explosion, shake effects
+│   ├── AgentVisualizer.ts   # Multi-panel agent status display
+│   ├── StreamingRenderer.ts # Token-by-token streaming + syntax highlighting (5 languages)
+│   ├── LayoutEngine.ts      # Dynamic terminal layout (header/main/footer)
+│   ├── KeyBindingManager.ts # Configurable key bindings
+│   └── Theme.ts             # Dark/light mode, gradient generation, ANSI helpers
+├── features/                # Advanced features
+│   ├── GitIntegration.ts    # AI commit, PR creation, code review
+│   ├── TestAgent.ts         # Auto-generate tests, mutation testing, coverage
+│   ├── ProfilerAgent.ts     # N+1 detection, memory leaks, bundle size, code smells
+│   ├── RecoverySystem.ts    # Time-travel restore points, rollback
+│   ├── OnboardingWizard.ts  # First-time setup flow
+│   └── GracefulShutdown.ts  # SIGTERM/SIGINT cleanup handlers
 ├── agents/                  # Specialized LLM agents
 │   ├── base-agent.ts        # Base agent with tool-calling loop
 │   ├── project-analyzer.ts  # Directory scanner + tech detector
@@ -459,8 +516,8 @@ src/
 │   └── logger.ts            # Terminal UI components
 ├── templates/               # Scaffold templates
 │   └── templates.ts         # 4 starter templates (Next.js, React+Vite, Express, FastAPI)
-└── vendor/                  # Vendored dependencies
-    ├── llm-client/          # LLM provider (OpenAI, NVIDIA, Mock) — native fetch
+└── vendor/                  # Vendored dependencies (backward-compat wrappers)
+    ├── llm-client/          # Re-exports from src/llm/
     └── shared-types/        # Shared TypeScript interfaces
 ```
 
@@ -469,6 +526,8 @@ src/
 - **No Python dependency** — fully self-contained Node.js CLI
 - **Zero external AI dependency** — LLM calls use vendored providers, not external API wrappers
 - **Tool-calling via text parsing** — `TOOL_CALL: {...}` JSON is parsed from LLM output, works with any provider (no native function-calling API needed)
+- **Multi-LLM routing** — 7 providers with auto-detect, use-case ranking, and fallback chain via `LLMRouter`
+- **Rich terminal UI** — double-buffered RGB renderer with animations, agent visualizer, streaming syntax highlighting
 - **Web search without API keys** — DuckDuckGo HTML scraping via built-in `https` module
 - **Three-layer security** — allowlist + blocklist + shell injection protection (`spawnSync` w/ `shell: false`). 30+ credential patterns filtered from child process env vars
 - **Prompt injection boundaries** — `<USER_GOAL>`, `<TOOL_RESULT>`, `<TOOL_CONTENT>` markers in system prompts
@@ -476,6 +535,9 @@ src/
 - **Targeted autofix edits** — `autofix` uses `oldString`→`newString` edits instead of full-file rewrites, preserving unrelated code
 - **All state is local** — `conf` npm package stores config at `~/.codethon/`
 - **Cross-platform Windows support** — `.cmd` wrapper detection with `resolveBin()`, `shell: true` for `.cmd` binaries
+- **NVIDIA API auto-detect** — `nvapi-*` keys in `OPENAI_API_KEY` are automatically routed to `integrate.api.nvidia.com/v1`
+- **REPL suggestion system** — live fuzzy-matched command dropdown with auto-scroll, navigable via up/down/Tab
+- **Brutal E2E test suite** — 58 integration tests exercising CLI bootstrap, all 26 commands, REPL pipe, error paths, and security boundaries
 
 ---
 
@@ -496,8 +558,12 @@ node dist/index.js init
 # Development with watch mode
 npm run dev
 
-# Test
-npm test         # 64+ tests across 7 files
+# Test (unit)
+npm test         # 64 tests across 7 files (vitest, single-fork)
+
+# E2E test (brutal)
+pwsh __tests__/brutal-e2e.ps1        # 58 tests
+pwsh __tests__/brutal-e2e.ps1 -Fast  # 36 tests (subset)
 
 # Type check
 npm run typecheck
@@ -510,9 +576,19 @@ npm run lint
 
 ```
 apps/cli/           # Single CLI package
-├── src/            # TypeScript source (40+ files)
-├── dist/           # Built output (1 MB CJS bundle)
-├── __tests__/      # Test files (7 files, 64+ tests)
+├── src/            # TypeScript source (60+ files)
+│   ├── commands/   # 28 command implementations
+│   ├── cil/        # Core intelligence layer (agent loop, tools, build engine)
+│   ├── llm/        # Multi-LLM router (7 providers, auto-detect, fallback)
+│   ├── ui/         # Terminal UI layer (renderer, animations, theme)
+│   ├── features/   # Advanced features (git, test, profiler, recovery)
+│   ├── agents/     # 10 specialized LLM agents
+│   ├── runtime/    # Command sandbox (allowlist/blocklist)
+│   ├── utils/      # Utilities (web search, env, help, logger)
+│   ├── templates/  # 4 scaffold templates
+│   └── vendor/     # Backward-compat wrappers
+├── dist/           # Built output (356 KB CJS bundle)
+├── __tests__/      # Unit tests (7 files, 64 tests) + E2E (58 tests)
 ├── package.json
 ├── tsconfig.json
 ├── tsup.config.ts

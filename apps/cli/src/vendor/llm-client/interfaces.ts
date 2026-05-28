@@ -1,39 +1,14 @@
-import type { LLMConfig } from '@codethon/shared-types';
+import { createProvider as createProviderInner } from '../../llm/providers/index';
+import type { LLMConfig } from '../shared-types/index';
 
-export interface LLMMessage {
-  role: 'system' | 'user' | 'assistant';
-  content: string;
-}
+export type { LLMMessage, LLMRequest, LLMResponse, LLMProvider, ProviderConfig, ProviderType, ToolDefinition } from '../../llm/providers/index';
 
-export interface LLMRequest {
-  messages: LLMMessage[];
-  temperature?: number;
-  maxTokens?: number;
-}
-
-export interface LLMResponse {
-  content: string;
-  usage?: {
-    promptTokens: number;
-    completionTokens: number;
-    totalTokens: number;
-  };
-}
-
-export interface LLMProvider {
-  generate(request: LLMRequest): Promise<LLMResponse>;
-  stream?(request: LLMRequest): AsyncIterable<string>;
-  name: string;
-}
-
-export function createProvider(config: LLMConfig): LLMProvider {
-  switch (config.provider) {
-    case 'openai':
-      const { OpenAIProvider } = require('./openai-adapter');
-      return new OpenAIProvider(config);
-    case 'nvidia':
-    default:
-      const { NVIDIAProvider } = require('./nvidia-adapter');
-      return new NVIDIAProvider(config);
-  }
+export function createProvider(config: LLMConfig): import('../../llm/providers/index').LLMProvider {
+  return createProviderInner({
+    provider: config.provider as import('../../llm/providers/index').ProviderType,
+    modelId: config.model || 'gpt-4o-mini',
+    apiKey: config.apiKey,
+    temperature: config.temperature,
+    maxTokens: config.maxTokens,
+  });
 }

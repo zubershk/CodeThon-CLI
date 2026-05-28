@@ -18,6 +18,7 @@ export class ArchitectAgent extends BaseAgent {
     project.architecture = {
       stack: [],
       backendStructure: output.details,
+      generatedAt: new Date().toISOString(),
     };
     this.state.saveArchitecture(project.architecture);
     return output;

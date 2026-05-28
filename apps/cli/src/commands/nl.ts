@@ -34,10 +34,10 @@ export async function naturalLanguageCommand(input: string) {
         webContent += `\n\n--- Page Content from ${page.url} ---\n${page.text}`;
         spinner.succeed(`Fetched: ${page.title || urls[0]}`);
       } else {
-        spinner.warn('Page returned no content');
+        spinner.info('Page returned no content');
       }
     } catch {
-      spinner.warn('Could not fetch page');
+      spinner.info('Could not fetch page');
     }
   }
 
@@ -53,10 +53,10 @@ export async function naturalLanguageCommand(input: string) {
       }
       searchSpinner.succeed('Web search complete');
     } else {
-      searchSpinner.warn('No search results');
+      searchSpinner.info('No search results');
     }
   } catch {
-    searchSpinner.warn('Web search failed');
+    searchSpinner.info('Web search failed');
   }
 
   const spinner = createSpinner('Analyzing...');
