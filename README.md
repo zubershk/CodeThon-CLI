@@ -45,11 +45,10 @@ ct init
 # Interactive wizard — defines your idea, stack, AI model
 ct init
 
-# Generate a roadmap and architecture
-ct roadmap
-ct architect
+# Generate a combined roadmap + architecture plan
+ct plan --stack nextjs+tailwind --feature "user authentication"
 
-# Scaffold a Next.js + Tailwind + Supabase starter
+# Or scaffold a Next.js + Tailwind + Supabase starter
 ct scaffold my-app
 cd my-app
 
@@ -91,11 +90,12 @@ CodeThon >
 Inside the REPL, you can:
 
 - Type any **natural language question** — automatically searches the web and crawls URLs
-- Use **slash commands** — `/help`, `/status`, `/doctor`, `/summarize`, `/review`, `/diff`, `/clear`, `/exit`
-- Navigate with **arrow keys** through command history
-- Use **tab completion** for slash commands
+- Use **slash commands** — `/help` (categorized), `/plan`, `/status`, `/doctor`, `/summarize`, `/review`, `/diff`, `/run`, `/clear`, `/exit`, plus all 27 CLI commands
+- Navigate with **arrow keys** through command history (200-entry ring buffer)
+- **Multi-line input** — Shift+Enter for newline, Enter to submit
+- **Tab completion** for slash commands
 
-The REPL shows a **context banner** at the top with your project name, stack, phase, health score, and AI model — so you always know where things stand.
+The REPL shows a **context banner** at the top with your project name, stack, phase, health score, and AI model — so you always know where things stand. The REPL uses a raw-mode keypress handler for precise cursor control.
 
 ```
   ────────────────────────────────────────────────────────
@@ -116,18 +116,19 @@ This turns the CLI into a **persistent, conversational execution teammate** — 
 | Command | What it does |
 |---|---|
 | `ct init` | Interactive wizard: define idea, pick stack + timeline + AI model |
-| `ct scaffold [dir]` | Generate a full Next.js + Tailwind + Supabase starter with dashboard UI |
+| `ct scaffold [dir]` | Generate a full Next.js + Tailwind + Supabase starter with dashboard UI. Use `-t, --template <name>` for non-interactive mode |
 | `ct status` | Show project health, model, phase, and configuration |
 
 ### AI & Planning
 
 | Command | What it does |
 |---|---|
+| `ct plan` | **Combined roadmap + architecture** — accepts `--stack` and `--feature` flags. Runs PM + Architect agents in sequence |
 | `ct roadmap` | Generate milestones and build plan |
 | `ct architect` | Design architecture + stack recommendations |
 | `ct learn` | Mentor mode — ask anything and get a guided tutorial |
 | `ct startup` | Analyze startup/business potential |
-| `ct deploy` | Generate step-by-step deployment guide (Vercel, Railway, Render, etc.) |
+| `ct deploy` | Deploy to Vercel or get a deployment guide |
 | `ct launch` | Generate demo-day assets (pitch, submission, social posts) |
 | `ct readme` | Auto-generate README.md and write it to disk |
 
@@ -218,7 +219,7 @@ ct explain this project to me
 
 ### Autonomous Execution Loop (`ct execute`)
 
-The CLI's most powerful mode. Give it a goal and it runs up to 20 iterations:
+The CLI's most powerful mode. Give it a goal and it runs up to 20 iterations with **live streaming output** — you watch the AI think, write files, and run commands in real time:
 
 ```
 ct execute "build a landing page with Tailwind"
@@ -230,49 +231,71 @@ Each iteration: **plan → research → execute → verify → fix → loop**.
   ────────────────────────────────────────────────
   ▶  Iteration 1
   ────────────────────────────────────────────────
-  ○ Read: package.json
-  ○ Search: "tailwind setup nextjs"
-  ✎ Write: app/page.tsx
-  ▸ Run: npm run build
+  ○ Reading: package.json
+  ○ Searching: "tailwind setup nextjs"
+  ★ Writing: app/page.tsx
+  ▸ Running: npm run build
+  ┌─ Output ──────────────────────────────────┐
+  │ > build                                    │
+  │ ✓ Build passed in 2.3s                    │
+  └────────────────────────────────────────────┘
+  ── Tool 1/4 completed in 1.2s ──
   ────────────────────────────────────────────────
   ▶  Iteration 2
   ────────────────────────────────────────────────
   ✓  Build passed
-  ✎ Write: app/globals.css
-  ▸ Run: npm run dev
+  ★ Writing: app/globals.css
+  ▸ Running: npm run dev
   ...
   ────────────────────────────────────────────────
-  ✓  Goal met after 4 iterations
+  ✓  Goal met after 4 iterations (total: 1m 23s)
 ```
+
+Key features:
+- **Token streaming** — model output appears character-by-character as the LLM generates it
+- **Per-tool timing** — each read/write/run shows elapsed time and iteration progress
+- **Terminal box** — command output rendered in a box with border characters
+- **Checkpoint recovery** — state saved every iteration; resumes on crash with `loadCheckpoint()`
+- **Auto-retry** — 2 retries on 502/503/504/timeout errors
+- **Context compaction** — automatically compresses long conversations (>20 messages or >8000 chars)
 
 Tools available to the agent:
 - `read_file` — read any file with line numbers
-- `write_file` — write new files, edit existing ones (with backup)
+- `write_file` — write new files, edit existing ones (with backup, rejects `.env` placeholders)
 - `search_files` — glob pattern matching
 - `grep_search` — regex content search
 - `list_directory` — browse project structure
-- `run_command` — execute shell commands (allowlisted)
+- `run_command` — execute shell commands (allowlisted, no shell injection)
 - `web_search` — search the web for docs/examples
 - `crawl_url` — fetch and extract full webpage content
 
 ### Safety-First Execution
 
-Two-layer security model:
+Three-layer security model:
 
 1. **Allowlist** — only known-safe commands run: `npm`, `git`, `node`, `python`, `docker`, `cat`, `ls`, `echo`, etc.
 2. **Blocklist** — dangerous patterns are rejected by regex: `rm -rf`, `sudo`, `chmod`, pipe-to-shell, fork bombs, `curl`/`wget`
+3. **Shell injection protection** — all commands use `spawnSync` with `shell: false` (no shell metacharacter injection). 30+ credential patterns filtered from child process env vars.
 
-**`--ask` flag** gates every operation with approval:
+**`--ask` flag** gates every operation with risk-calibrated approval:
 
 ```bash
 ct --ask execute "reset the database"
 ```
 
-Shows a risk-calibrated prompt with a colored diff before writing files or running commands.
+**`--dry-run` flag** previews changes without writing:
+
+```bash
+ct --dry-run execute "add a landing page"
+```
+
+**Prompt injection boundaries** — `<USER_GOAL>`, `<TOOL_RESULT>`, `<TOOL_CONTENT>` markers isolate data from instructions in all system prompts.
 
 ### Self-Healing Build Pipeline
 
-`ct build` and `ct autofix` run actual build commands (`npm run build`, `npx tsc --noEmit`, `next build`), capture the real error output, parse it (TypeScript, Next.js, ESLint, npm formats all supported), and generate AI-driven fixes that are applied to your files.
+`ct build` and `ct autofix` run actual build commands (`npm run build`, `npx tsc --noEmit`, `next build`), capture the real error output, parse it (TypeScript, Next.js, ESLint, npm formats all supported), and generate AI-driven fixes.
+
+Fixes use **targeted `oldString`→`newString` edits** — the LLM receives the original file contents alongside build errors, and outputs only the changed lines. This prevents the common problem of AI tools rewriting entire files and hallucinating unrelated changes.
 
 No "here's a suggestion, fix it yourself" — the CLI **edits the files and re-runs the build**.
 
@@ -352,13 +375,15 @@ ct model
 
 ### Environment Variables
 
-Configure via `.env` file in the working directory or system environment:
+Configure via `.env` file — the CLI chain-loads from your project directory up to the root, so API keys in a parent `.env` are always found:
 
 ```env
 OPENAI_API_KEY=sk-...
 NVIDIA_API_KEY=nvapi-...
 CODETHON_NVIDIA_KEY=nvapi-...
 ```
+
+**Note:** The AI agent is prevented from creating `.env` files or writing placeholder keys (`your_api_key_here`). Create your `.env` before running `ct execute`.
 
 ### Global Flags
 
@@ -367,6 +392,22 @@ CODETHON_NVIDIA_KEY=nvapi-...
 | `-d, --debug` | Enable verbose debug output |
 | `-o, --output <format>` | Output format: `text` (default) or `json` |
 | `-a, --ask` | Require approval before running commands or modifying files |
+| `-n, --dry-run` | Preview changes without writing files or executing commands |
+
+### Scaffold Templates
+
+| Template | Description |
+|---|---|
+| `nextjs-tailwind` | Next.js + Tailwind CSS + TypeScript (recommended) |
+| `react-vite` | React + Vite + TypeScript |
+| `express-api` | Express.js REST API + TypeScript |
+| `python-fastapi` | Python FastAPI + uvicorn |
+
+Use `-t, --template <name>` to skip interactive selection:
+
+```bash
+ct scaffold my-app -t nextjs-tailwind
+```
 
 ### Config File
 
@@ -381,19 +422,22 @@ src/
 ├── index.ts                 # CLI entry point, commander setup, NL fallback
 ├── commands/                # One file per command
 │   ├── init.ts              # Interactive project wizard
-│   ├── execute.ts           # Autonomous execution loop
+│   ├── plan.ts              # Combined roadmap + architecture (--stack, --feature flags)
+│   ├── execute.ts           # Rich live execution UI (thinking animation, per-tool timing)
 │   ├── build.ts             # Build engine command
 │   ├── autofix.ts           # Auto-fix command
 │   ├── debug.ts             # Debug assistant
 │   ├── nl.ts                # Natural language with web search
-│   ├── scaffold.ts          # Starter project generator
+│   ├── scaffold.ts          # Starter project generator (4 templates, --template flag)
 │   ├── emergency.ts         # Demo-day crisis mode
-│   ├── deploy.ts            # Deployment guide
-│   └── ...                  # roadmap, architect, launch, etc.
+│   ├── deploy.ts            # Real Vercel deployment (auto-installs CLI, deploys, captures URL)
+│   ├── repl.ts              # Interactive REPL (raw-mode keypress, multi-line, categorized /help)
+│   ├── run.ts               # Shell command runner with live streaming terminal preview
+│   └── ...                  # roadmap, architect, launch, etc. (27 total)
 ├── cil/                     # Core intelligence layer
-│   ├── job-loop.ts          # 20-iteration autonomous agent loop
-│   ├── tools.ts             # 8-tool executor (read, write, search, etc.)
-│   ├── build-engine.ts      # Three-stage build pipeline
+│   ├── job-loop.ts          # 20-iteration autonomous agent loop (streaming, retry, compaction)
+│   ├── tools.ts             # 8-tool executor (read, write, search, etc.) + .env guard
+│   ├── build-engine.ts      # Three-stage build pipeline (targeted autofix edits)
 │   ├── state-manager.ts     # Project state CRUD with event history
 │   └── health-score.ts      # 6-dimension health calculator
 ├── agents/                  # Specialized LLM agents
@@ -401,16 +445,22 @@ src/
 │   ├── project-analyzer.ts  # Directory scanner + tech detector
 │   └── ...
 ├── runtime/                 # Command execution sandbox
-│   ├── executor.ts          # Allowlist/blocklist + execSync wrapper
+│   ├── executor.ts          # Allowlist/blocklist + spawnSync wrapper
 │   └── index.ts             # Runtime exports
 ├── utils/                   # Utilities
 │   ├── web-search.ts        # DuckDuckGo/Bing search + URL crawler
 │   ├── render.ts            # Custom markdown ANSI renderer
 │   ├── error-parser.ts      # tsc/Next.js/ESLint/npm error parser
 │   ├── approval.ts          # --ask flag + diff-based approval
+│   ├── help.ts              # Categorized help output (shared by CLI and REPL)
+│   ├── env.ts               # sanitizeEnv(), resolveBin(), spawnCommand() (cross-platform)
+│   ├── terminal-preview.ts  # Streaming terminal output via spawn + readline
+│   ├── splash.ts            # ASCII art splash banner
 │   └── logger.ts            # Terminal UI components
+├── templates/               # Scaffold templates
+│   └── templates.ts         # 4 starter templates (Next.js, React+Vite, Express, FastAPI)
 └── vendor/                  # Vendored dependencies
-    ├── llm-client/          # LLM provider (OpenAI, NVIDIA, Mock)
+    ├── llm-client/          # LLM provider (OpenAI, NVIDIA, Mock) — native fetch
     └── shared-types/        # Shared TypeScript interfaces
 ```
 
@@ -420,8 +470,12 @@ src/
 - **Zero external AI dependency** — LLM calls use vendored providers, not external API wrappers
 - **Tool-calling via text parsing** — `TOOL_CALL: {...}` JSON is parsed from LLM output, works with any provider (no native function-calling API needed)
 - **Web search without API keys** — DuckDuckGo HTML scraping via built-in `https` module
-- **Dual-layer security** — allowlist + blocklist for command execution
+- **Three-layer security** — allowlist + blocklist + shell injection protection (`spawnSync` w/ `shell: false`). 30+ credential patterns filtered from child process env vars
+- **Prompt injection boundaries** — `<USER_GOAL>`, `<TOOL_RESULT>`, `<TOOL_CONTENT>` markers in system prompts
+- **Checkpoint recovery** — autonomous execution saves state each iteration; resumes on crash
+- **Targeted autofix edits** — `autofix` uses `oldString`→`newString` edits instead of full-file rewrites, preserving unrelated code
 - **All state is local** — `conf` npm package stores config at `~/.codethon/`
+- **Cross-platform Windows support** — `.cmd` wrapper detection with `resolveBin()`, `shell: true` for `.cmd` binaries
 
 ---
 
@@ -443,7 +497,7 @@ node dist/index.js init
 npm run dev
 
 # Test
-npm test         # 49+ tests
+npm test         # 64+ tests across 7 files
 
 # Type check
 npm run typecheck
@@ -456,9 +510,9 @@ npm run lint
 
 ```
 apps/cli/           # Single CLI package
-├── src/            # TypeScript source
+├── src/            # TypeScript source (40+ files)
 ├── dist/           # Built output (1 MB CJS bundle)
-├── __tests__/      # Test files (5 files, 49+ tests)
+├── __tests__/      # Test files (7 files, 64+ tests)
 ├── package.json
 ├── tsconfig.json
 ├── tsup.config.ts
@@ -473,8 +527,7 @@ apps/cli/           # Single CLI package
 
 ```bash
 ct init                                    # "Idea: A todo app with auth"
-ct roadmap                                 # Plan milestones
-ct architect                               # Design architecture
+ct plan --feature "task management"        # Combined roadmap + architecture
 ct scaffold my-hackathon                   # Generate starter code
 cd my-hackathon
 ct execute "add a PostgreSQL database with Prisma schema for tasks"
@@ -511,11 +564,8 @@ ct execute "research how to implement Stripe checkout in Next.js, then build it"
 
 ## Roadmap
 
-- Interactive REPL mode with slash commands (`/plan`, `/review`, `/diff`, `/goal`)
-- `ct test` — run project tests and report results
-- Multi-file context window management for large codebases
-- Plugin system for custom tools and agents
-- Web UI companion for visual project management
+- Performance benchmarks and regression testing
+- Documentation site and video tutorials
 
 ---
 

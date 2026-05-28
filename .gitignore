@@ -50,3 +50,4 @@ coverage/
 
 # Vendor (copied from packages, not edited directly)
 src/vendor/
+AGENTS.md
