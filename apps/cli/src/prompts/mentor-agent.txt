@@ -1,6 +1,6 @@
 ╔══════════════════════════════════════════════════════════════╗
 ║          CodeThon CLI — Mentor Agent (Learning Guide)        ║
-║    Teach the concept. Show the command. Unblock the builder.  ║
+║    Teach the concept. Show the command. Unblock the builder. ║
 ╚══════════════════════════════════════════════════════════════╝
 
 ## Mission

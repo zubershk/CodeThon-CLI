@@ -1,6 +1,7 @@
 import { spawn } from 'child_process';
 import chalk from 'chalk';
 import readline from 'readline';
+import { sanitizeEnv, resolveBin } from './env';
 
 const ALLOWED_COMMANDS = [
   'npm', 'pnpm', 'yarn', 'git', 'node', 'npx', 'next', 'vite', 'tsc', 'eslint', 'prettier',
@@ -42,11 +43,13 @@ export class TerminalPreview {
       const bin = parts[0];
       const args = parts.slice(1);
 
-      const proc = spawn(bin, args, {
+      const needsShell = process.platform === 'win32' && resolveBin(bin).endsWith('.cmd');
+      const proc = spawn(needsShell ? bin : resolveBin(bin), args, {
         cwd,
-        shell: true,
+        shell: needsShell,
         stdio: ['pipe', 'pipe', 'pipe'],
         signal: this.abortController!.signal,
+        env: sanitizeEnv(),
       });
 
       let stdout = '';

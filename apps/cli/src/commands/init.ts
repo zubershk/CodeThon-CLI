@@ -229,12 +229,12 @@ export async function initCommand(): Promise<CommandResult> {
   logger.info('');
   logger.highlight('Recommended next steps:');
   logger.info('');
-  logger.commandBlock('ct roadmap');
-  logger.muted('   \u2514\u2500 Generate milestones and plan your build');
-  logger.commandBlock('ct architect');
-  logger.muted('   \u2514\u2500 Design your architecture and stack');
+  logger.commandBlock('ct plan --feature "<your feature>"');
+  logger.muted('   \u2514\u2500 Generate roadmap + architecture in one command');
   logger.commandBlock('ct scaffold');
   logger.muted('   \u2514\u2500 Generate starter project files');
+  logger.commandBlock('ct execute "<goal>"');
+  logger.muted('   \u2514\u2500 Start building with the autonomous agent');
 
   return {
     success: true,

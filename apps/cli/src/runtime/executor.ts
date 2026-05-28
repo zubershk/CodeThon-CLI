@@ -1,4 +1,4 @@
-import { execSync } from 'child_process';
+import { spawnSync } from 'child_process';
 
 const ALLOWED_COMMANDS = [
   'npm', 'pnpm', 'yarn', 'bun',
@@ -65,13 +65,24 @@ export function executeCommand(command: string, timeoutMs = 30000): ExecResult {
     return { success: false, stdout: '', stderr: check.reason || 'Command not allowed', exitCode: 1 };
   }
 
+  const parts = command.split(/\s+/);
+  const bin = parts[0];
+  const args = parts.slice(1);
+  const isWin = process.platform === 'win32';
+  const winCmdWrappers = new Set(['npm', 'npx', 'pnpm', 'yarn', 'next', 'vite', 'tsc', 'eslint', 'prettier', 'gh', 'code', 'docker', 'docker-compose']);
+  const needsShell = isWin && winCmdWrappers.has(bin);
+  const spawnBin = needsShell ? `${bin}.cmd` : bin;
+
   try {
-    const stdout = execSync(command, {
+    const result = spawnSync(spawnBin, args, {
       timeout: timeoutMs,
       encoding: 'utf-8',
       maxBuffer: 1024 * 1024,
+      shell: needsShell,
     });
-    return { success: true, stdout: stdout.trim(), stderr: '', exitCode: 0 };
+
+    if (result.error) throw result.error;
+    return { success: result.status === 0, stdout: (result.stdout ?? '').trim(), stderr: (result.stderr ?? '').trim(), exitCode: result.status };
   } catch (error: unknown) {
     if (error instanceof Error) {
       const err = error as Error & { stderr?: string; stdout?: string; status?: number };

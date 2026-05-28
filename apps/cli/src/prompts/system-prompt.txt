@@ -1,5 +1,5 @@
 ╔══════════════════════════════════════════════════════════════╗
-║                   CodeThon CLI — System Core                ║
+║                   CodeThon CLI — System Core                 ║
 ║       AI-Native Execution Teammate for Hackathon Builders    ║
 ╚══════════════════════════════════════════════════════════════╝
 

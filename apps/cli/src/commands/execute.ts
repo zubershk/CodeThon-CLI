@@ -5,6 +5,7 @@ import type { JobStatus } from '../cil/job-loop';
 import type { ToolCall, ToolResult } from '../cil/tools';
 import { getLLMConfig } from '../utils/config';
 import { renderAgentOutput } from '../utils/render';
+import { showSplash } from '../utils/splash';
 
 const ACCENT = '#7C3AED';
 const GOLD = '#F59E0B';
@@ -28,7 +29,7 @@ function fmtTime(seconds?: number): string {
   return `${m}m ${s}s`;
 }
 
-export async function executeCommand(goal: string): Promise<CommandResult> {
+export async function executeCommand(goal: string, askMode = false, dryRun = false): Promise<CommandResult> {
   if (!goal) {
     process.stderr.write(chalk.red('\u2605 Error: No goal specified. Usage: ct execute "<goal>"\n'));
     return { success: false, message: 'No goal specified' };
@@ -37,12 +38,22 @@ export async function executeCommand(goal: string): Promise<CommandResult> {
   const config = getLLMConfig();
   const modelLabel = config.model?.split('/').pop() || config.model || 'unknown';
   const maxIterations = 40;
-  const loop = new JobLoop(process.cwd(), maxIterations);
+  const loop = new JobLoop(process.cwd(), maxIterations, askMode, dryRun);
   const errors: string[] = [];
   let dotInterval: ReturnType<typeof setInterval> | null = null;
 
+  const quote = [
+    { t: '"Code is poetry written in logic."', a: '' },
+    { t: '"Build things that matter."', a: '' },
+    { t: '"First make it work, then make it fast."', a: '' },
+    { t: '"Done is better than perfect."', a: '' },
+    { t: '"Push yourself — no one else will."', a: '' },
+    { t: '"The best time to start was yesterday."', a: '' },
+  ][Math.floor(Math.random() * 6)];
+
   process.stdout.write(
-    `\n  ${chalk.hex(ACCENT)('\u2605')}  ${chalk.bold('CodeThon Execute')}\n` +
+    `\n  ${chalk.hex(ACCENT)('\u2605')}  ${chalk.bold('Execute')}\n` +
+    `  ${chalk.hex(GOLD)(quote.t)} ${chalk.dim(quote.a)}\n` +
     `  ${chalk.dim(`${modelLabel}  |  max ${maxIterations} iterations`)}\n` +
     `  ${chalk.hex(ACCENT)('\u2500'.repeat(52))}\n\n`
   );

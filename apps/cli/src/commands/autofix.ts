@@ -3,10 +3,10 @@ import type { CommandResult } from '@codethon/shared-types';
 import { BuildEngine } from '../cil/build-engine';
 import { logger, createSpinner } from '../utils';
 
-export async function autofixCommand(): Promise<CommandResult> {
+export async function autofixCommand(askMode = false, dryRun = false): Promise<CommandResult> {
   logger.section('CodeThon CLI — Auto-Fix');
 
-  const engine = new BuildEngine(process.cwd());
+  const engine = new BuildEngine(process.cwd(), askMode, dryRun);
 
   try {
     const spinner = createSpinner(chalk.yellowBright('Scanning for build errors...'));

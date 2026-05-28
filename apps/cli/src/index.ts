@@ -7,6 +7,7 @@ import chalk from 'chalk';
 import {
   initCommand,
   modelCommand,
+  planCommand,
   roadmapCommand,
   architectCommand,
   scaffoldCommand,
@@ -35,9 +36,39 @@ import {
 import { logger, showStartupTips } from './utils';
 
 
-dotenv.config();
+import fs from 'fs';
+import path from 'path';
+function loadDotenvChain(startDir: string): void {
+  const loaded = new Set<string>();
+  let dir = startDir;
+  while (true) {
+    const candidate = path.join(dir, '.env');
+    if (fs.existsSync(candidate)) {
+      const resolved = path.resolve(candidate);
+      if (!loaded.has(resolved)) {
+        loaded.add(resolved);
+        dotenv.config({ path: resolved });
+      }
+    }
+    const parent = path.dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+}
+loadDotenvChain(process.cwd());
 
 process.on('SIGTERM', () => process.exit(0));
+
+process.on('unhandledRejection', (reason: unknown) => {
+  const msg = reason instanceof Error ? reason.message : String(reason);
+  process.stderr.write(`\n  \u2717 Unhandled Rejection: ${msg}\n`);
+  process.exit(1);
+});
+
+process.on('uncaughtException', (error: Error) => {
+  process.stderr.write(`\n  \u2717 Uncaught Exception: ${error.message}\n`);
+  process.exit(1);
+});
 
 const program = new Command();
 
@@ -45,9 +76,10 @@ program
   .name('ct')
   .description('CodeThon CLI — AI-native execution orchestration for hackathons')
   .version('0.1.0')
-  .option('-d, --debug', 'enable verbose debug output')
+  .option('--debug', 'enable verbose debug output')
   .option('-o, --output <format>', 'output format (text|json)', 'text')
-  .option('-a, --ask', 'require approval before running commands or modifying files');
+  .option('-a, --ask', 'require approval before running commands or modifying files')
+  .option('-n, --dry-run', 'show what would be done without making changes');
 
 program
   .command('init')
@@ -110,12 +142,29 @@ program
   });
 
 program
+  .command('plan')
+  .description('Generate combined roadmap + architecture plan')
+  .argument('[args...]', '--stack <stack> --feature <description>')
+  .action(async (args: string[]) => {
+    try {
+      const result = await planCommand((args || []).join(' '));
+      if (program.getOptionValue('output') === 'json') {
+        console.log(JSON.stringify(result, null, 2));
+      }
+    } catch (error) {
+      logger.error(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      process.exit(1);
+    }
+  });
+
+program
   .command('scaffold')
   .description('Scaffold a starter project')
   .argument('[directory]', 'target directory')
-  .action(async (dir?: string) => {
+  .option('-t, --template <name>', 'template name (non-interactive)')
+  .action(async (dir?: string, opts?: { template?: string }) => {
     try {
-      const result = await scaffoldCommand(dir);
+      const result = await scaffoldCommand(dir, opts?.template);
       if (program.getOptionValue('output') === 'json') {
         console.log(JSON.stringify(result, null, 2));
       }
@@ -282,7 +331,9 @@ program
   .argument('[goal]', 'build goal (e.g. "add auth" or "fix the login page")')
   .action(async (goal?: string) => {
     try {
-      const result = await buildCommand(goal);
+      const ask = program.getOptionValue('ask') as boolean;
+      const dryRun = program.getOptionValue('dryRun') as boolean;
+      const result = await buildCommand(goal, ask, dryRun);
       if (program.getOptionValue('output') === 'json') {
         console.log(JSON.stringify(result, null, 2));
       }
@@ -297,7 +348,9 @@ program
   .description('Auto-detect build errors and fix them in project files')
   .action(async () => {
     try {
-      const result = await autofixCommand();
+      const ask = program.getOptionValue('ask') as boolean;
+      const dryRun = program.getOptionValue('dryRun') as boolean;
+      const result = await autofixCommand(ask, dryRun);
       if (program.getOptionValue('output') === 'json') {
         console.log(JSON.stringify(result, null, 2));
       }
@@ -313,7 +366,9 @@ program
   .argument('<goal>', 'what to build or accomplish')
   .action(async (goal: string) => {
     try {
-      const result = await executeCommand(goal);
+      const ask = program.getOptionValue('ask') as boolean;
+      const dryRun = program.getOptionValue('dryRun') as boolean;
+      const result = await executeCommand(goal, ask, dryRun);
       if (program.getOptionValue('output') === 'json') {
         console.log(JSON.stringify(result, null, 2));
       }
@@ -394,16 +449,32 @@ program
   });
 
 (async () => {
+  // Show splash on no-args or known commands
+  const { showSplash, showMiniSplash } = await import('./utils/splash');
+  const knownCommands = program.commands.map(c => c.name());
+  const firstArg = process.argv[2];
+
   // Launch REPL if no command
   if (process.argv.length < 3) {
+    process.stdout.write(showSplash());
     const { replCommand } = await import('./commands/repl');
-    await replCommand();
+    const ask = program.getOptionValue('ask') as boolean;
+    const dryRun = program.getOptionValue('dryRun') as boolean;
+    await replCommand(ask, dryRun);
     return;
   }
 
+  // Show categorized help for --help / help
+  if (firstArg === '--help' || firstArg === '-h' || firstArg === 'help') {
+    process.stdout.write(showSplash());
+    const { showCategorizedHelp } = await import('./utils/help');
+    showCategorizedHelp();
+    return;
+    } else if (firstArg === 'execute' || firstArg === 'build' || firstArg === 'plan' || firstArg === 'init' || firstArg === 'model') {
+    process.stdout.write(showMiniSplash());
+  }
+
   // Natural language fallback — check before Commander parses
-  const knownCommands = program.commands.map(c => c.name());
-  const firstArg = process.argv[2];
   const isKnown = knownCommands.includes(firstArg || '');
 
   if (firstArg && !isKnown && !firstArg.startsWith('-')) {

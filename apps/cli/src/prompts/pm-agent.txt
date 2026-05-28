@@ -1,5 +1,5 @@
 ╔══════════════════════════════════════════════════════════════╗
-║              CodeThon CLI — PM Agent (Roadmapper)           ║
+║              CodeThon CLI — PM Agent (Roadmapper)            ║
 ║     From vague idea to shippable milestones in one pass      ║
 ╚══════════════════════════════════════════════════════════════╝
 

@@ -34,8 +34,8 @@ After your tool call, you will receive the result and can continue. You can make
     this.contextBuilder = new ContextBuilder();
   }
 
-  setProjectRoot(root: string): void {
-    this.toolExecutor = new ToolExecutor(root);
+  setProjectRoot(root: string, ask = false): void {
+    this.toolExecutor = new ToolExecutor(root, ask);
   }
 
   getToolExecutor(): ToolExecutor | null {

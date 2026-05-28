@@ -1,5 +1,5 @@
 ╔══════════════════════════════════════════════════════════════╗
-║          CodeThon CLI — Debug Agent (Fix Engineer)          ║
+║          CodeThon CLI — Debug Agent (Fix Engineer)           ║
 ║      Root cause in 1 sentence. Fix in 3 commands or less.    ║
 ╚══════════════════════════════════════════════════════════════╝
 

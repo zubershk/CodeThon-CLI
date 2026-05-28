@@ -1,6 +1,8 @@
 import fs from 'fs';
 import path from 'path';
-import { execSync } from 'child_process';
+import { spawnSync } from 'child_process';
+import { sanitizeEnv } from '../utils/env';
+import { requireApproval } from '../utils/approval';
 
 export interface ToolDef {
   name: string;
@@ -113,20 +115,24 @@ const BLOCKED_RE = [/rm\s+-rf/i, /sudo/i, /curl/i, /wget/i, />\s*\//i, /\|\s*(ba
 export class ToolExecutor {
   private projectRoot: string;
   private fileHistory: Map<string, string> = new Map();
+  private askMode: boolean;
+  private dryRun: boolean;
 
-  constructor(projectRoot: string) {
+  constructor(projectRoot: string, askMode = false, dryRun = false) {
     this.projectRoot = path.resolve(projectRoot);
+    this.askMode = askMode;
+    this.dryRun = dryRun;
   }
 
   async execute(call: ToolCall): Promise<ToolResult> {
     try {
       switch (call.tool) {
-        case 'read_file': return this.readFile(call);
-        case 'write_file': return this.writeFile(call);
-        case 'search_files': return this.searchFiles(call);
-        case 'grep_search': return this.grepSearch(call);
-        case 'list_directory': return this.listDir(call);
-        case 'run_command': return this.runCommand(call);
+        case 'read_file': return await this.readFile(call);
+        case 'write_file': return await this.writeFile(call);
+        case 'search_files': return await this.searchFiles(call);
+        case 'grep_search': return await this.grepSearch(call);
+        case 'list_directory': return await this.listDir(call);
+        case 'run_command': return await this.runCommand(call);
         default:
           return { id: call.id, tool: call.tool, output: '', error: `Unknown tool: ${call.tool}` };
       }
@@ -166,6 +172,33 @@ export class ToolExecutor {
   private async writeFile(call: ToolCall): Promise<ToolResult> {
     const filePath = this.resolvePath(call.args.path);
     const dir = path.dirname(filePath);
+
+    if (this.dryRun) {
+      const existing = fs.existsSync(filePath) ? ' (overwrite)' : '';
+      return { id: call.id, tool: call.tool, output: `[DRY RUN] Would write ${call.args.path} (${call.args.content?.length ?? 0} bytes)${existing}` };
+    }
+
+    if (this.askMode) {
+      const existing = fs.existsSync(filePath);
+      const approved = await requireApproval({
+        type: existing ? 'modify_file' : 'write_file',
+        description: existing ? `Modify: ${call.args.path}` : `Create: ${call.args.path}`,
+        details: `Path: ${filePath}\nSize: ~${(call.args.content?.length ?? 0)} bytes`,
+        risk: existing ? (call.args.content?.length > 10000 ? 'high' : 'medium') : 'low',
+      });
+      if (!approved) {
+        return { id: call.id, tool: call.tool, output: '', error: 'Write rejected by user (--ask mode)' };
+      }
+    }
+
+    const isEnvFile = path.basename(filePath) === '.env';
+    if (isEnvFile) {
+      const hasPlaceholder = /your[_-]?(api|key|secret|token)[_-]?here/i.test(call.args.content || '') || call.args.content?.includes('your_nvidia_api_key_here');
+      if (hasPlaceholder) {
+        return { id: call.id, tool: call.tool, output: `Skipped .env (contains placeholder values — keys are already in environment)`, error: 'REJECTED: .env with placeholder keys. The environment is already configured.' };
+      }
+    }
+
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }
@@ -231,10 +264,23 @@ export class ToolExecutor {
     // Try ripgrep first
     let results = '';
     try {
-      results = execSync(
-        `rg -n "${pattern.replace(/"/g, '\\"')}" --glob "${include}" --glob '!node_modules' --glob '!.git' --glob '!.next' --glob '!dist' -m 5 2>nul`,
-        { cwd: this.projectRoot, encoding: 'utf-8', maxBuffer: 1024 * 1024, timeout: 10000 }
-      );
+      const rgResult = spawnSync('rg', [
+        '-n', pattern,
+        '--glob', include,
+        '--glob', '!node_modules',
+        '--glob', '!.git',
+        '--glob', '!.next',
+        '--glob', '!dist',
+        '-m', '5',
+      ], {
+        cwd: this.projectRoot,
+        encoding: 'utf-8',
+        maxBuffer: 1024 * 1024,
+        timeout: 10000,
+        shell: false,
+      });
+      results = rgResult.stdout ?? '';
+      if (rgResult.error) throw rgResult.error;
     } catch {
       // Fallback: manual grep using Node.js
       const matches: string[] = [];
@@ -304,22 +350,58 @@ export class ToolExecutor {
 
   private async runCommand(call: ToolCall): Promise<ToolResult> {
     const cmd = call.args.command;
-    const first = cmd.split(/\s+/)[0];
+    const parts = cmd.split(/\s+/);
+    const first = parts[0];
     if (!ALLOWED_BINS.has(first)) {
       return { id: call.id, tool: call.tool, output: '', error: `Command "${first}" is not allowed` };
     }
     for (const re of BLOCKED_RE) {
       if (re.test(cmd)) {
-        return { id: call.id, tool: call.tool, output: '', error: `Command matches blocked pattern` };
+        return { id: call.id, tool: call.tool, output: '', error: 'Command matches blocked pattern' };
       }
     }
     const timeout = call.args.timeout || 30000;
+
+    if (this.dryRun) {
+      return { id: call.id, tool: call.tool, output: `[DRY RUN] Would run: ${cmd} (timeout: ${timeout}ms)` };
+    }
+
+    if (this.askMode) {
+      const approved = await requireApproval({
+        type: 'command',
+        description: cmd.slice(0, 120),
+        details: `Directory: ${this.projectRoot}\nTimeout: ${timeout}ms`,
+        risk: cmd.startsWith('rm ') || cmd.startsWith('sudo ') ? 'high' : 'medium',
+      });
+      if (!approved) {
+        return { id: call.id, tool: call.tool, output: '', error: 'Command rejected by user (--ask mode)' };
+      }
+    }
+
+    const isWin = process.platform === 'win32';
+    const winCmdWrappers = new Set(['npm', 'npx', 'pnpm', 'yarn', 'next', 'vite', 'tsc', 'eslint', 'prettier', 'gh', 'code', 'docker', 'docker-compose']);
+    const needsShell = isWin && winCmdWrappers.has(first);
+    const spawnBin = needsShell ? `${first}.cmd` : first;
+    const args = parts.slice(1);
+
     try {
-      const stdout = execSync(cmd, { cwd: this.projectRoot, timeout, encoding: 'utf-8', maxBuffer: 1024 * 1024 });
-      return { id: call.id, tool: call.tool, output: stdout.trim() || '(no output)' };
+      const result = spawnSync(spawnBin, args, {
+        cwd: this.projectRoot,
+        timeout,
+        encoding: 'utf-8',
+        maxBuffer: 1024 * 1024,
+        shell: needsShell,
+        env: sanitizeEnv(),
+      });
+
+      if (result.error) throw result.error;
+      if (result.status !== 0) {
+        const stderr = result.stderr?.trim() || result.stdout?.trim() || '';
+        return { id: call.id, tool: call.tool, output: stderr, error: `Exit code: ${result.status}` };
+      }
+      return { id: call.id, tool: call.tool, output: result.stdout?.trim() || '(no output)' };
     } catch (e: any) {
-      const stderr = e.stderr?.toString() || e.message;
-      return { id: call.id, tool: call.tool, output: stderr, error: `Exit code: ${e.status || 1}` };
+      return { id: call.id, tool: call.tool, output: e.message, error: `Exit code: ${e.status || 1}` };
     }
   }
 

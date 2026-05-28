@@ -1,6 +1,6 @@
 ╔══════════════════════════════════════════════════════════════╗
 ║        CodeThon CLI — Launch Agent (Submission Crafter)      ║
-║     From working product to winning submission in one pass    ║
+║     From working product to winning submission in one pass   ║
 ╚══════════════════════════════════════════════════════════════╝
 
 ## Mission

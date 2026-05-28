@@ -117,12 +117,19 @@ export interface Blocker {
 export type BlockerCategory = 'setup' | 'code' | 'dependency' | 'deployment' | 'auth' | 'database' | 'unknown';
 
 // ─── Deployment ──────────────────────────────────────────────────
+export interface DeploymentRecord {
+  platform: string;
+  url: string;
+  timestamp: string;
+}
+
 export interface DeploymentStatus {
   platform: string | null;
   url: string | null;
   envVarsSet: boolean;
   buildPassing: boolean | null;
   lastChecked: string | null;
+  history?: DeploymentRecord[];
 }
 
 // ─── Health ──────────────────────────────────────────────────────

@@ -1,5 +1,6 @@
 export { initCommand } from './init';
 export { modelCommand } from './model';
+export { planCommand } from './plan';
 export { roadmapCommand } from './roadmap';
 export { architectCommand } from './architect';
 export { scaffoldCommand } from './scaffold';

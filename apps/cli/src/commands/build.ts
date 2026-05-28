@@ -5,7 +5,7 @@ import { StateManager } from '../cil/state-manager';
 import { logger } from '../utils';
 import { startAgent, succeedAgent, failAgent } from '../utils/agent-feed';
 
-export async function buildCommand(goal?: string): Promise<CommandResult> {
+export async function buildCommand(goal?: string, askMode = false, dryRun = false): Promise<CommandResult> {
   logger.section('CodeThon CLI — Autonomous Builder');
 
   const state = new StateManager();
@@ -17,7 +17,7 @@ export async function buildCommand(goal?: string): Promise<CommandResult> {
   }
 
   const buildGoal = goal || project.idea || 'Build a complete working application';
-  const engine = new BuildEngine(process.cwd());
+  const engine = new BuildEngine(process.cwd(), askMode, dryRun);
 
   try {
     // Step 1: Analyze
