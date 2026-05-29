@@ -5,6 +5,7 @@ import { ToolExecutor } from './tools';
 import type { ToolCall, ToolResult } from './tools';
 import { searchWeb, crawlUrl } from '../utils/web-search';
 import { ProjectAnalyzer } from '../agents/project-analyzer';
+import { formatApiError } from '../utils/api-error';
 import fs from 'fs';
 import path from 'path';
 
@@ -60,7 +61,8 @@ GUIDELINES:
 - NEVER write placeholder API keys like "your_api_key_here". If a project needs an API key, read it from process.env or import.meta.env.`;
 
 export class JobLoop {
-  private provider: LLMProvider;
+  private provider: LLMProvider | null = null;
+  private router: LLMRouter | null = null;
   private executor: ToolExecutor;
   private maxIterations: number;
   private conversation: LLMMessage[] = [];
@@ -69,9 +71,9 @@ export class JobLoop {
   private readonly COMPACT_THRESHOLD = 20;
   private goal = '';
   private checkpointPath = '';
-  private router: LLMRouter | null = null;
   private costTracker: CostTracker | null = null;
   private useFallback: boolean;
+  private providerInitError: string | null = null;
 
   constructor(projectRoot: string, maxIterations = 20, askMode = false, dryRun = false, useFallback = false) {
     this.useFallback = useFallback;
@@ -81,17 +83,36 @@ export class JobLoop {
     if (useFallback) {
       this.router = new LLMRouter();
       this.costTracker = new CostTracker();
-      this.provider = null as unknown as LLMProvider;
     } else {
-      const config = getLLMConfig();
-      this.provider = createProvider({
-        provider: config.provider as any,
-        modelId: config.model || 'gpt-4o-mini',
-        apiKey: config.apiKey,
-        temperature: config.temperature,
-        maxTokens: config.maxTokens,
-      });
+      try {
+        const config = getLLMConfig();
+        this.provider = createProvider({
+          provider: config.provider as any,
+          modelId: config.model || 'gpt-4o-mini',
+          apiKey: config.apiKey,
+          temperature: config.temperature,
+          maxTokens: config.maxTokens,
+        });
+      } catch (e: any) {
+        this.providerInitError = e.message || String(e);
+      }
     }
+  }
+
+  private ensureProvider(): LLMProvider {
+    if (this.provider) return this.provider;
+    if (this.providerInitError) {
+      throw new Error(`LLM provider init failed: ${this.providerInitError}. Run /onboard to configure API keys.`);
+    }
+    const config = getLLMConfig();
+    this.provider = createProvider({
+      provider: config.provider as any,
+      modelId: config.model || 'gpt-4o-mini',
+      apiKey: config.apiKey,
+      temperature: config.temperature,
+      maxTokens: config.maxTokens,
+    });
+    return this.provider;
   }
 
   private async withRetry<T>(fn: () => Promise<T>, _label: string, retries = 2): Promise<T> {
@@ -215,6 +236,16 @@ export class JobLoop {
     this.startTime = Date.now();
     this.goal = goal;
 
+    // Fail early if provider can't be initialized
+    try {
+      this.ensureProvider();
+    } catch (e: any) {
+      const msg = formatApiError(e) || e.message || String(e);
+      errors.push(msg);
+      onStatus?.({ iteration: 0, phase: 'done', description: msg, done: true, error: msg });
+      return { success: false, iterations: 0, summary: msg, errors, elapsed: 0 };
+    }
+
     this.projectContext = await this.buildProjectContext();
 
     const checkpointDir = path.join(this.executor.getProjectRoot(), '.codethon');
@@ -247,9 +278,10 @@ export class JobLoop {
       try {
         content = await this.withRetry(() => this.generateWithStream(onToken), 'LLM generate');
       } catch (e: any) {
-        errors.push(`LLM error: ${e.message}`);
+        const friendly = formatApiError(e);
+        errors.push(friendly);
         onStatus?.({ iteration, phase: 'done', description: `LLM error: ${e.message}`, done: true, error: e.message });
-        return { success: false, iterations: iteration + 1, summary: `Failed: ${e.message}`, errors, elapsed: Math.floor((Date.now() - this.startTime) / 1000) };
+        return { success: false, iterations: iteration + 1, summary: friendly, errors, elapsed: Math.floor((Date.now() - this.startTime) / 1000) };
       }
 
       const genElapsed = Math.floor((Date.now() - iterStart) / 1000);
@@ -355,6 +387,8 @@ export class JobLoop {
   }
 
   private async generateWithStream(onToken?: (token: string) => void): Promise<string> {
+    const provider = this.ensureProvider();
+
     if (this.useFallback && this.router) {
       const result = await this.router.callWithFallback(
         this.conversation.map(m => `${m.role}: ${m.content}`).join('\n'),
@@ -375,9 +409,9 @@ export class JobLoop {
       return result.response;
     }
 
-    if (onToken && this.provider.stream) {
+    if (onToken && provider.stream) {
       let content = '';
-      const stream = this.provider.stream({
+      const stream = provider.stream({
         messages: this.conversation,
         temperature: 0.3,
         maxTokens: 4000,
@@ -389,7 +423,7 @@ export class JobLoop {
       return content;
     }
 
-    const response = await this.provider.generate({
+    const response = await provider.generate({
       messages: this.conversation,
       temperature: 0.3,
       maxTokens: 4000,

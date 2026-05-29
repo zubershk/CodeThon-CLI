@@ -36,7 +36,7 @@ export async function architectCommand(): Promise<CommandResult> {
 
     return { success: true, message: 'Architecture generated', data: { architecture: fullOutput } };
   } catch (error) {
-    logger.error(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    logger.error(error instanceof Error ? error.message : String(error));
     return { success: false, message: 'Failed to design architecture' };
   }
 }

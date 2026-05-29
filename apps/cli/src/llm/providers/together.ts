@@ -13,6 +13,7 @@ export class TogetherProvider extends OpenAIProvider {
       modelId: config.modelId || 'meta-llama/Llama-3.3-70B-Instruct-Turbo',
       baseURL: TOGETHER_BASE_URL,
       costPer1MTokens: config.costPer1MTokens || { input: 0.10, output: 0.10 },
+      displayName: 'Together',
     });
     this.baseUrl = TOGETHER_BASE_URL;
   }

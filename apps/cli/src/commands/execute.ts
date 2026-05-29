@@ -149,11 +149,12 @@ export async function executeCommand(goal: string, askMode = false, dryRun = fal
       visualizer.render();
       showToolResult(status.toolResult);
     } else if (status.phase === 'done') {
+      const ok = !status.error;
       visualizer.updateAgent('main', {
         name: 'CodeThon Agent',
-        icon: result.success ? '\u2713' : '\u2717',
-        status: result.success ? 'done' : 'error',
-        currentTask: result.success ? 'Goal met!' : 'Max iterations reached',
+        icon: ok ? '\u2713' : '\u2717',
+        status: ok ? 'done' : 'error',
+        currentTask: ok ? 'Goal met!' : status.description || 'Failed',
         progress: 1,
       });
       visualizer.render();

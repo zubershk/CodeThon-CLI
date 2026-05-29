@@ -5,11 +5,12 @@ import os from 'os';
 import type { CommandResult } from '@codethon/shared-types';
 import { OnboardingWizard } from '../features/onboarding';
 import { logger } from '../utils';
+import { hasAnyApiKey } from '../utils/api-error';
 
 export async function onboardCommand(): Promise<CommandResult> {
   const wizard = new OnboardingWizard();
 
-  if (wizard.isComplete()) {
+  if (wizard.isComplete() && hasAnyApiKey()) {
     const step = wizard.currentStep();
     logger.info(`Setup already complete (step ${step})`);
     logger.info(`Run ${chalk.cyanBright('/model')} to change AI models`);
@@ -23,9 +24,10 @@ export async function onboardCommand(): Promise<CommandResult> {
 
   // Check available API keys
   const keyChecks = [
+    { name: 'NVIDIA (FREE)', env: 'NVIDIA_API_KEY', url: 'https://build.nvidia.com' },
+    { name: 'Groq (FREE)', env: 'GROQ_API_KEY', url: 'https://console.groq.com/keys' },
     { name: 'OpenAI', env: 'OPENAI_API_KEY', url: 'https://platform.openai.com/api-keys' },
     { name: 'Anthropic', env: 'ANTHROPIC_API_KEY', url: 'https://console.anthropic.com/settings/keys' },
-    { name: 'Groq (FREE)', env: 'GROQ_API_KEY', url: 'https://console.groq.com/keys' },
     { name: 'DeepSeek', env: 'DEEPSEEK_API_KEY', url: 'https://platform.deepseek.com/api_keys' },
     { name: 'Together AI', env: 'TOGETHER_API_KEY', url: 'https://api.together.ai/settings/api-keys' },
   ];
@@ -49,9 +51,32 @@ export async function onboardCommand(): Promise<CommandResult> {
   const hasLmStudio = await checkLocalServer('http://localhost:1234');
   if (hasOllama) logger.info(`  ${chalk.greenBright('\u2713')} Ollama ${chalk.dim('(running on localhost:11434)')}`);
   if (hasLmStudio) logger.info(`  ${chalk.greenBright('\u2713')} LM Studio ${chalk.dim('(running on localhost:1234)')}`);
-  if (!hasOllama && !hasLmStudio && found.length === 0) {
-    logger.info(`  ${chalk.dim('\u25CB')} No local LLM servers detected`);
-    logger.info(`    ${chalk.dim('Install Ollama:')} ${chalk.cyanBright('https://ollama.ai')}`);
+  if (!hasOllama && !hasLmStudio && found.length === 0 && missing.length === keyChecks.length) {
+    logger.info(`  ${chalk.dim('\u25CB')} No API keys or local servers found`);
+    logger.info(`    ${chalk.dim('Get a free NVIDIA API key:')} ${chalk.cyanBright('https://build.nvidia.com')}`);
+    logger.info(`    ${chalk.dim('Or install Ollama:')} ${chalk.cyanBright('https://ollama.ai')}`);
+    logger.info(`    ${chalk.dim('Or get a free Groq API key:')} ${chalk.cyanBright('https://console.groq.com/keys')}`);
+  }
+
+  // Show which commands work without AI
+  if (found.length === 0 && !hasOllama && !hasLmStudio) {
+    console.log('');
+    logger.info(chalk.bold('Set an API key now:'));
+    for (const k of keyChecks) {
+      logger.info(`  ${chalk.cyanBright(`$env:${k.env}="<your-key>"`)}  ${chalk.dim(`(PowerShell)`)}`);
+      logger.info(`  ${chalk.cyanBright(`set ${k.env}=<your-key>`)}        ${chalk.dim(`(CMD)`)}`);
+      logger.info(`  ${chalk.dim(`Get key:`)} ${chalk.cyanBright(k.url)}`);
+      logger.info('');
+    }
+    console.log('');
+    logger.info(chalk.bold('Commands that work without an API key:'));
+    logger.info(`  ${chalk.cyanBright('ct init')}      ${chalk.dim('- Configure your project')}`);
+    logger.info(`  ${chalk.cyanBright('ct model')}     ${chalk.dim('- Switch AI models/providers')}`);
+    logger.info(`  ${chalk.cyanBright('ct scaffold')}  ${chalk.dim('- Generate project template files')}`);
+    logger.info(`  ${chalk.cyanBright('ct doctor')}    ${chalk.dim('- System diagnostics (Node, TS, configs)')}`);
+    logger.info(`  ${chalk.cyanBright('ct status')}    ${chalk.dim('- View project config and health')}`);
+    logger.info(`  ${chalk.cyanBright('ct deploy')}    ${chalk.dim('- Deploy to Vercel')}`);
+    logger.info(`  ${chalk.cyanBright('ct review')}    ${chalk.dim('- Git diff review')}`);
   }
 
   // Create .codethon config dir

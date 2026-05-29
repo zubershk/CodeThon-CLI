@@ -31,7 +31,7 @@ export async function modelCommand(): Promise<CommandResult> {
       name: `  ${formatModelEntry(m)}`,
       value: m.id,
     })),
-    new inquirer.Separator(chalk.magenta('── NVIDIA (Free, no API key needed) ──')),
+    new inquirer.Separator(chalk.magenta('── NVIDIA (Free tier, set NVIDIA_API_KEY) ──')),
     ...nvidiaModels.map((m) => ({
       name: `  ${formatModelEntry(m)}`,
       value: m.id,
@@ -74,7 +74,7 @@ export async function modelCommand(): Promise<CommandResult> {
   logger.divider();
 
   const envHint = modelInfo.provider === 'nvidia'
-    ? chalk.magenta('NVIDIA: API key optional — most models are free')
+    ? chalk.magenta('NVIDIA: Set NVIDIA_API_KEY (free tier at https://build.nvidia.com)')
     : chalk.cyan('OpenAI: Set OPENAI_API_KEY or CODETHON_OPENAI_KEY in .env');
 
   logger.info(`  ${chalk.dim('\u25B8')} ${envHint}`);

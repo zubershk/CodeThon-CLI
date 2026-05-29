@@ -1,6 +1,6 @@
 {
   "name": "codethon-cli",
-  "version": "0.2.0",
+  "version": "0.2.2",
   "description": "AI-native execution orchestration for developers and hackathon builders — plan, build, debug, and ship from your terminal.",
   "bin": {
     "ct": "dist/index.js"
@@ -9,16 +9,8 @@
   "type": "module",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "default": "./dist/index.js"
-    }
-  },
   "files": [
     "dist/index.js",
-    "dist/index.d.ts",
     "README.md",
     "LICENSE"
   ],

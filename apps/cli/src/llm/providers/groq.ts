@@ -13,6 +13,7 @@ export class GroqProvider extends OpenAIProvider {
       modelId: config.modelId || 'mixtral-8x7b-32768',
       baseURL: GROQ_BASE_URL,
       costPer1MTokens: config.costPer1MTokens || { input: 0, output: 0 },
+      displayName: 'Groq',
     });
     this.baseUrl = GROQ_BASE_URL;
   }

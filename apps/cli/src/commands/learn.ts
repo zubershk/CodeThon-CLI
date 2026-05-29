@@ -32,7 +32,7 @@ export async function learnCommand(): Promise<CommandResult> {
     return { success: true, message: 'Question answered', data: { answer: output.details } };
   } catch (error) {
     spinner.fail('Failed to get answer');
-    logger.error(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    logger.error(error instanceof Error ? error.message : String(error));
     return { success: false, message: 'Failed to get answer' };
   }
 }

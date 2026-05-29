@@ -12,6 +12,7 @@ const OPENAI_MODEL_COSTS: Record<string, { input: number; output: number }> = {
 
 export class OpenAIProvider implements LLMProvider {
   name = 'openai';
+  protected displayName: string;
   protected baseUrl: string;
   private apiKey: string;
   private model: string;
@@ -26,6 +27,7 @@ export class OpenAIProvider implements LLMProvider {
     this.defaultTemperature = config.temperature ?? 0.3;
     this.defaultMaxTokens = config.maxTokens ?? 4096;
     this.costs = OPENAI_MODEL_COSTS[this.model] || config.costPer1MTokens || { input: 3, output: 6 };
+    this.displayName = config.displayName || 'OpenAI';
   }
 
   async generate(request: LLMRequest): Promise<LLMResponse> {
@@ -46,7 +48,7 @@ export class OpenAIProvider implements LLMProvider {
 
     if (!response.ok) {
       const errText = await response.text();
-      throw new Error(`OpenAI API error ${response.status}: ${errText}`);
+      throw new Error(`${this.displayName} API error ${response.status}: ${errText}`);
     }
 
     const data = await response.json() as {
@@ -82,7 +84,7 @@ export class OpenAIProvider implements LLMProvider {
 
     if (!response.ok) {
       const errText = await response.text();
-      throw new Error(`OpenAI API error ${response.status}: ${errText}`);
+      throw new Error(`${this.displayName} API error ${response.status}: ${errText}`);
     }
 
     const reader = response.body!.getReader();

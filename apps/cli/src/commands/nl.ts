@@ -5,6 +5,7 @@ import { StateManager } from '../cil/state-manager';
 import { logger, createSpinner } from '../utils';
 import { renderAgentOutput } from '../utils/render';
 import { searchWeb, crawlUrl } from '../utils/web-search';
+import { formatApiError } from '../utils/api-error';
 
 function extractUrls(text: string): string[] {
   const urlRegex = /(https?:\/\/[^\s,)]+)/gi;
@@ -99,7 +100,9 @@ If the user asks about something you don't know, ask if they want you to search 
     return { success: true, message: 'Query answered', data: { response: response.content } };
   } catch (error) {
     spinner.fail('Failed to process query');
-    logger.error(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    const config = getLLMConfig();
+    const friendly = formatApiError(error, config.provider);
+    logger.error(friendly);
     return { success: false, message: 'Query failed' };
   }
 }

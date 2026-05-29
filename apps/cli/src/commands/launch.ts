@@ -49,7 +49,7 @@ export async function launchCommand(): Promise<CommandResult> {
     return { success: true, message: 'Launch assets generated', data: { assets: full } };
   } catch (error) {
     spinner.fail('Failed to generate launch assets');
-    logger.error(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    logger.error(error instanceof Error ? error.message : String(error));
     return { success: false, message: 'Failed to generate launch assets' };
   }
 }

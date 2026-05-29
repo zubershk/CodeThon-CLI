@@ -50,7 +50,7 @@ export async function emergencyCommand(): Promise<CommandResult> {
     return { success: true, message: 'Emergency assessment complete', data: { assessment: output.details } };
   } catch (error) {
     spinner.fail('Failed to assess emergency');
-    logger.error(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    logger.error(error instanceof Error ? error.message : String(error));
     return { success: false, message: 'Failed to assess emergency' };
   }
 }

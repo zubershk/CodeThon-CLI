@@ -133,11 +133,13 @@ function computeSuggestions(): void {
   const words = inputBuffer.split(/\s+/);
   const lastWord = words[words.length - 1] || '';
 
-  if (inputBuffer.startsWith('/') && words.length === 1 && lastWord.length >= 1) {
+  if (inputBuffer.startsWith('/')) {
     const scored = ALL_CMDS
       .map(cmd => {
         const entry = SLASH_COMMANDS.find(s => s.cmd === cmd)!;
-        return { cmd, desc: entry.desc, score: fuzzyScore(lastWord, cmd) };
+        if (words.length === 1) return { cmd, desc: entry.desc, score: fuzzyScore(lastWord, cmd) };
+        if (words.length > 1 && cmd.startsWith(lastWord)) return { cmd, desc: entry.desc, score: 1 };
+        return { cmd, desc: entry.desc, score: 0 };
       })
       .filter(s => s.score > 0)
       .sort((a, b) => b.score - a.score);
@@ -331,7 +333,7 @@ async function submit(): Promise<void> {
   cursorPos = 0;
   prevCursorLine = 0;
 
-  process.stdout.write('\n');
+  console.log('');
 
   const trimmed = input.trim();
   if (trimmed) {
@@ -349,16 +351,18 @@ async function submit(): Promise<void> {
     try {
       await handleInput(trimmed);
     } catch (e: any) {
-      logger.error(`Error: ${e.message}`);
+      const { formatApiError } = await import('../utils/api-error');
+      logger.error(formatApiError(e));
     }
     if (inq) {
       (readline as any).emitKeypressEvents(process.stdin);
       process.stdin.on('keypress', handleKeypress);
       try { process.stdin.setRawMode(true); } catch {}
     }
+    // Ensure stdin stays in flowing mode on Windows after long-running commands
+    process.stdin.resume();
   }
 
-  console.log('');
   contextBanner();
   console.log('');
   process.stdout.write(promptStr);
@@ -538,6 +542,17 @@ export async function replCommand(ask = false, dryRun = false): Promise<void> {
   contextBanner();
   console.log('');
 
+  // First-run check: if no API keys detected, auto-run onboard guide
+  const { hasAnyApiKey } = await import('../utils/api-error');
+  if (!hasAnyApiKey()) {
+    logger.info('No API keys detected. Running setup guide...');
+    console.log('');
+    await onboardCommand();
+    console.log('');
+    contextBanner();
+    console.log('');
+  }
+
   inputBuffer = '';
   cursorPos = 0;
   prevCursorLine = 0;
@@ -555,6 +570,7 @@ export async function replCommand(ask = false, dryRun = false): Promise<void> {
   (readline as any).emitKeypressEvents(process.stdin);
   process.stdin.on('keypress', handleKeypress);
   try { process.stdin.setRawMode(true); } catch {}
+  process.stdin.resume();
 
   process.stdout.write(promptStr);
   prevCursorLine = 0;

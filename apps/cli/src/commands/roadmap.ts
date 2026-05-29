@@ -45,7 +45,7 @@ export async function roadmapCommand(): Promise<CommandResult> {
     return { success: true, message: 'Roadmap generated', data: { roadmap: fullOutput } };
   } catch (error) {
     spinner.fail('Failed to generate roadmap');
-    logger.error(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    logger.error(error instanceof Error ? error.message : String(error));
     return { success: false, message: 'Failed to generate roadmap' };
   }
 }

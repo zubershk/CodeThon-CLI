@@ -33,7 +33,7 @@ export async function startupCommand(): Promise<CommandResult> {
     return { success: true, message: 'Startup analysis complete', data: { analysis: output.details } };
   } catch (error) {
     spinner.fail('Failed to analyze startup potential');
-    logger.error(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    logger.error(error instanceof Error ? error.message : String(error));
     return { success: false, message: 'Failed to analyze startup potential' };
   }
 }

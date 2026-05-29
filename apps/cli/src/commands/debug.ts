@@ -124,7 +124,7 @@ export async function debugCommand(errorInput?: string): Promise<CommandResult> 
     };
   } catch (error) {
     spinner.fail('Failed to analyze error');
-    logger.error(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    logger.error(error instanceof Error ? error.message : String(error));
     return { success: false, message: 'Failed to analyze error' };
   }
 }

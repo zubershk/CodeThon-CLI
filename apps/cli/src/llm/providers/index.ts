@@ -59,6 +59,7 @@ export interface ProviderConfig {
   temperature?: number;
   maxTokens?: number;
   costPer1MTokens?: { input: number; output: number };
+  displayName?: string;
 }
 
 export function createProvider(config: ProviderConfig): LLMProvider {
@@ -75,6 +76,7 @@ export function createProvider(config: ProviderConfig): LLMProvider {
       provider: 'openai',
       baseURL: 'https://integrate.api.nvidia.com/v1',
       modelId: config.modelId || 'nvidia/llama-3.3-nemotron-super-49b-v1',
+      displayName: 'NVIDIA',
     });
     default: throw new Error(`Unknown provider: ${config.provider}`);
   }

@@ -10,6 +10,7 @@ export class LocalServerProvider extends OpenAIProvider {
       apiKey: config.apiKey || 'not-needed',
       baseURL: config.baseURL || process.env.LOCAL_LLM_URL || 'http://localhost:1234/v1',
       costPer1MTokens: { input: 0, output: 0 },
+      displayName: 'Local Server',
     });
   }
 
