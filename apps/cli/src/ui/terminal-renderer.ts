@@ -28,7 +28,10 @@ export class TerminalRenderer {
   private cursorX = 0;
   private cursorY = 0;
   private supportsRGB: boolean;
-  private frameCount = 0;
+  private resizeHandler: () => void;
+  private alternateScreen = false;
+  private cursorHidden = false;
+  private disposed = false;
 
   constructor() {
     this.width = process.stdout.columns || 80;
@@ -37,24 +40,89 @@ export class TerminalRenderer {
     this.prevBuffer = this.createBuffer();
     this.supportsRGB = this.detectRGB();
 
-    process.stdout.on('resize', () => {
+    this.resizeHandler = () => {
       this.width = process.stdout.columns || 80;
       this.height = process.stdout.rows || 24;
-      const newBuffer = this.createBuffer();
-      for (let y = 0; y < Math.min(this.height, this.buffer.length); y++) {
-        for (let x = 0; x < Math.min(this.width, this.buffer[0]?.length || 0); x++) {
-          newBuffer[y][x] = this.buffer[y][x];
-        }
-      }
-      this.buffer = newBuffer;
+      this.buffer = this.createBuffer();
       this.prevBuffer = this.createBuffer();
-    });
+      this.cursorX = 0;
+      this.cursorY = 0;
+    };
+
+    process.stdout.on('resize', this.resizeHandler);
+  }
+
+  private sanitizeText(text: string): string {
+    return text
+      .replace(/\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])/g, '')
+      .replace(/\r/g, '');
+  }
+
+  private resetBuffers(): void {
+    this.buffer = this.createBuffer();
+    this.prevBuffer = this.createBuffer();
+    this.cursorX = 0;
+    this.cursorY = 0;
+  }
+
+  enterAlternateScreen(): void {
+    if (!process.stdout.isTTY || this.alternateScreen) return;
+    process.stdout.write('\x1b[?1049h\x1b[H\x1b[2J');
+    this.alternateScreen = true;
+    this.resetBuffers();
+  }
+
+  leaveAlternateScreen(): void {
+    if (!process.stdout.isTTY || !this.alternateScreen) return;
+    process.stdout.write('\x1b[0m\x1b[2J\x1b[H\x1b[?1049l');
+    this.alternateScreen = false;
+    this.resetBuffers();
+  }
+
+  hideCursor(): void {
+    if (!process.stdout.isTTY || this.cursorHidden) return;
+    process.stdout.write('\x1b[?25l');
+    this.cursorHidden = true;
+  }
+
+  showCursor(): void {
+    if (!process.stdout.isTTY || !this.cursorHidden) return;
+    process.stdout.write('\x1b[?25h');
+    this.cursorHidden = false;
+  }
+
+  dispose(options: { restoreScreen?: boolean } = {}): void {
+    if (this.disposed) return;
+    this.disposed = true;
+    process.stdout.off('resize', this.resizeHandler);
+    this.showCursor();
+    if (options.restoreScreen) {
+      this.leaveAlternateScreen();
+    } else {
+      process.stdout.write('\x1b[0m');
+    }
   }
 
   private createBuffer(): Cell[][] {
     return Array.from({ length: this.height }, () =>
       Array.from({ length: this.width }, () => ({ char: ' ' }))
     );
+  }
+
+  clearRegion(x: number, y: number, width: number, height: number): void {
+    for (let row = y; row < y + height; row++) {
+      for (let col = x; col < x + width; col++) {
+        this.setPixel(col, row, ' ');
+      }
+    }
+  }
+
+  fillRect(x: number, y: number, width: number, height: number, style?: Partial<Omit<Cell, 'char'>>): void {
+    for (let row = y; row < y + height; row++) {
+      for (let col = x; col < x + width; col++) {
+        this.setPixel(col, row, ' ', style);
+      }
+    }
   }
 
   private detectRGB(): boolean {
@@ -69,8 +137,21 @@ export class TerminalRenderer {
   }
 
   writeText(x: number, y: number, text: string, style?: Partial<Omit<Cell, 'char'>>): void {
-    for (let i = 0; i < text.length; i++) {
-      this.setPixel(x + i, y, text[i], style);
+    const sanitized = this.sanitizeText(text);
+    let currentX = x;
+    let currentY = y;
+
+    for (const char of sanitized) {
+      if (char === '\n') {
+        currentX = x;
+        currentY++;
+        if (currentY >= this.height) break;
+        continue;
+      }
+
+      this.setPixel(currentX, currentY, char, style);
+      currentX++;
+      if (currentX >= this.width) break;
     }
   }
 
@@ -85,6 +166,13 @@ export class TerminalRenderer {
       fillColor,
     } = options;
 
+    if (width < 2 || height < 2) return;
+    if (x >= this.width || y >= this.height) return;
+
+    const clippedWidth = Math.min(width, this.width - x);
+    const clippedHeight = Math.min(height, this.height - y);
+    if (clippedWidth < 2 || clippedHeight < 2) return;
+
     const colors = theme.colors;
     const borderColor = colors[color];
 
@@ -96,25 +184,25 @@ export class TerminalRenderer {
 
     // corners
     this.setPixel(x, y, tl, { fg: borderColor });
-    this.setPixel(x + width - 1, y, tr, { fg: borderColor });
-    this.setPixel(x, y + height - 1, bl, { fg: borderColor });
-    this.setPixel(x + width - 1, y + height - 1, br, { fg: borderColor });
+    this.setPixel(x + clippedWidth - 1, y, tr, { fg: borderColor });
+    this.setPixel(x, y + clippedHeight - 1, bl, { fg: borderColor });
+    this.setPixel(x + clippedWidth - 1, y + clippedHeight - 1, br, { fg: borderColor });
 
     // edges
-    for (let i = 1; i < width - 1; i++) {
+    for (let i = 1; i < clippedWidth - 1; i++) {
       this.setPixel(x + i, y, h, { fg: borderColor });
-      this.setPixel(x + i, y + height - 1, h, { fg: borderColor });
+      this.setPixel(x + i, y + clippedHeight - 1, h, { fg: borderColor });
     }
-    for (let i = 1; i < height - 1; i++) {
+    for (let i = 1; i < clippedHeight - 1; i++) {
       this.setPixel(x, y + i, v, { fg: borderColor });
-      this.setPixel(x + width - 1, y + i, v, { fg: borderColor });
+      this.setPixel(x + clippedWidth - 1, y + i, v, { fg: borderColor });
     }
 
     // title
     if (title) {
+      const displayTitle = ` ${this.sanitizeText(title)} `.slice(0, Math.max(0, clippedWidth - 4));
       const titleStart = x + 2;
-      const displayTitle = ` ${title} `;
-      for (let i = 0; i < displayTitle.length; i++) {
+      for (let i = 0; i < displayTitle.length && titleStart + i < x + clippedWidth - 1; i++) {
         this.setPixel(titleStart + i, y, displayTitle[i], { fg: borderColor, bold: true });
       }
     }
@@ -122,8 +210,8 @@ export class TerminalRenderer {
     // fill
     if (fill && fillColor) {
       const fillRGB = colors[fillColor];
-      for (let fy = y + 1; fy < y + height - 1; fy++) {
-        for (let fx = x + 1; fx < x + width - 1; fx++) {
+      for (let fy = y + 1; fy < y + clippedHeight - 1; fy++) {
+        for (let fx = x + 1; fx < x + clippedWidth - 1; fx++) {
           const existing = this.buffer[fy]?.[fx];
           if (existing && existing.char !== ' ' && existing.char !== h && existing.char !== v) continue;
           this.setPixel(fx, fy, ' ', { bg: fillRGB });
@@ -138,8 +226,7 @@ export class TerminalRenderer {
 
   clearScreen(): void {
     process.stdout.write('\x1b[2J\x1b[H');
-    this.buffer = this.createBuffer();
-    this.prevBuffer = this.createBuffer();
+    this.resetBuffers();
   }
 
   flush(): void {

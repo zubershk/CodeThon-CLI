@@ -1,9 +1,10 @@
-import inquirer from 'inquirer';
 import type { CommandResult } from '@codethon/shared-types';
 import { BaseAgent } from '../agents/base-agent';
 import { EMERGENCY_AGENT_PROMPT } from '../prompts';
 import { StateManager } from '../cil/state-manager';
-import { createSpinner, logger } from '../utils';
+import { logger } from '../utils';
+import { promptLongText } from '../utils/prompt';
+import { createMarkdownStreamRenderer } from '../utils/render';
 
 export async function emergencyCommand(): Promise<CommandResult> {
   logger.section('CodeThon CLI — Emergency Recovery');
@@ -17,29 +18,21 @@ export async function emergencyCommand(): Promise<CommandResult> {
     return { success: false, message: 'No active project' };
   }
 
-  const { situation } = await inquirer.prompt([
-    {
-      type: 'editor',
-      name: 'situation',
-      message: 'Describe the emergency (what crashed, what error you see):',
-      validate: (input: string) => input.trim().length > 0 ? true : 'Please describe the emergency',
-    },
-  ]);
+  const situation = await promptLongText({
+    message: 'Describe the emergency (what crashed, what error you see):',
+    validate: (input: string) => input.trim().length > 0 ? true : 'Please describe the emergency',
+  });
 
   const agent = new BaseAgent(EMERGENCY_AGENT_PROMPT);
-  const spinner = createSpinner('Assessing emergency...');
-  spinner.start();
+  const stream = createMarkdownStreamRenderer({ title: 'Emergency Assessment' });
 
   try {
-    const output = await agent.run('emergency', situation);
-
-    spinner.succeed('Emergency assessment ready!');
-    logger.info('');
-    logger.outputBlock(output.details);
+    const assessment = await agent.runStream('emergency', token => stream.write(token), situation);
+    stream.end();
     logger.info('');
 
     project.blockers.push({
-      description: `Emergency: ${output.summary}`,
+      description: `Emergency: ${assessment.slice(0, 100)}`,
       severity: 'critical',
       category: 'unknown',
       timestamp: new Date().toISOString(),
@@ -47,9 +40,9 @@ export async function emergencyCommand(): Promise<CommandResult> {
     });
     state.updateProject({ blockers: project.blockers, sprintPhase: 'debugging' });
 
-    return { success: true, message: 'Emergency assessment complete', data: { assessment: output.details } };
+    return { success: true, message: 'Emergency assessment complete', data: { assessment } };
   } catch (error) {
-    spinner.fail('Failed to assess emergency');
+    stream.end();
     logger.error(error instanceof Error ? error.message : String(error));
     return { success: false, message: 'Failed to assess emergency' };
   }

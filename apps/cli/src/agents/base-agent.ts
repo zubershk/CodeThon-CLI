@@ -1,7 +1,7 @@
 import { createProvider } from '@codethon/llm-client';
 import type { LLMProvider, LLMMessage } from '@codethon/llm-client';
 import type { AgentOutput } from '@codethon/shared-types';
-import { getLLMConfig } from '../utils/config';
+import { getLLMConfig, validateProviderConfig } from '../utils/config';
 import { formatApiError, friendlyAgentError, isAuthError } from '../utils/api-error';
 import { SYSTEM_PROMPT } from '../prompts';
 import { ContextBuilder } from '../cil/context-builder';
@@ -65,6 +65,8 @@ After your tool call, you will receive the result and can continue. You can make
   }
 
   private ensureProvider(): LLMProvider {
+    const check = validateProviderConfig();
+    if (!check.ok) throw new BaseAgentError(`\u26A0  ${check.message}`, undefined as any);
     if (this.provider) return this.provider;
     const config = getLLMConfig();
     this.provider = createProvider(config);

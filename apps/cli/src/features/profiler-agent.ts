@@ -19,6 +19,11 @@ export interface CodeSmellFinding {
   metric?: { value: number; threshold: number };
 }
 
+export interface ProfilerProgress {
+  onProgress?: (message: string) => void;
+  onFile?: (file: string, index: number, total: number) => void;
+}
+
 export class ProfilerAgent {
   private projectRoot: string;
 
@@ -26,19 +31,27 @@ export class ProfilerAgent {
     this.projectRoot = projectRoot;
   }
 
-  async analyze(): Promise<(PerformanceFinding | CodeSmellFinding)[]> {
+  async analyze(progress: ProfilerProgress = {}): Promise<(PerformanceFinding | CodeSmellFinding)[]> {
     const findings: (PerformanceFinding | CodeSmellFinding)[] = [];
     const files = this.getSourceFiles();
+    const maxFiles = 200;
 
-    for (const file of files.slice(0, 50)) {
+    progress.onProgress?.(`Discovered ${files.length} source file${files.length === 1 ? '' : 's'} across ${this.getSourceRoots().length} source root${this.getSourceRoots().length === 1 ? '' : 's'}`);
+    progress.onProgress?.(`Scanning up to ${Math.min(files.length, maxFiles)} files for performance and maintainability issues`);
+
+    for (const [index, file] of files.slice(0, maxFiles).entries()) {
       try {
+        progress.onFile?.(path.relative(this.projectRoot, file), index + 1, Math.min(files.length, maxFiles));
         const content = fs.readFileSync(file, 'utf-8');
         findings.push(...this.checkFile(findings.length, file, content));
         findings.push(...this.checkCodeSmells(file, content));
       } catch { /* skip unreadable files */ }
     }
 
+    progress.onProgress?.('Checking package dependencies for unused or heavy libraries');
     this.checkUnusedDependencies(findings as PerformanceFinding[]);
+
+    progress.onProgress?.('Checking known bundle-size risk dependencies');
     this.checkBundleSize(findings as PerformanceFinding[]);
 
     return findings;
@@ -198,8 +211,12 @@ export class ProfilerAgent {
     // Magic numbers
     const magicNumRegex = /[^a-zA-Z0-9](\d{4,})(?![a-zA-Z%])/g;
     let magicMatch: RegExpExecArray | null;
+    let magicFindings = 0;
     while ((magicMatch = magicNumRegex.exec(content)) !== null) {
+      if (magicFindings >= 3) break;
       const lineNum = content.slice(0, magicMatch.index).split('\n').length;
+      const sourceLine = lines[lineNum - 1] || '';
+      if (/model|id|version|date|timestamp|port|timeout|maxTokens|contextWindow/i.test(sourceLine)) continue;
       findings.push({
         severity: 'low',
         category: 'magic-number',
@@ -207,6 +224,7 @@ export class ProfilerAgent {
         line: lineNum,
         message: `Magic number ${magicMatch[1]}. Consider extracting to a named constant.`,
       });
+      magicFindings++;
     }
 
     // TODO/FIXME comments
@@ -302,17 +320,53 @@ export class ProfilerAgent {
     } catch { /* skip */ }
   }
 
+  private getSourceRoots(): string[] {
+    const candidates = [
+      'src',
+      'app',
+      'pages',
+      'components',
+      'lib',
+      'server',
+      'apps',
+      'packages',
+      'services',
+      'libs',
+    ];
+    const roots = candidates
+      .map(candidate => path.join(this.projectRoot, candidate))
+      .filter(candidate => {
+        try {
+          return fs.existsSync(candidate) && fs.statSync(candidate).isDirectory();
+        } catch {
+          return false;
+        }
+      });
+    return roots.length > 0 ? roots : [this.projectRoot];
+  }
+
   private getSourceFiles(): string[] {
-    return this.walkDir(path.join(this.projectRoot, 'src'));
+    const files = new Set<string>();
+    for (const root of this.getSourceRoots()) {
+      for (const file of this.walkDir(root)) {
+        files.add(file);
+      }
+    }
+    return [...files];
   }
 
   private walkDir(dir: string): string[] {
     const files: string[] = [];
+    const skipDirs = new Set([
+      'node_modules', '.git', 'dist', 'build', 'out', '.next', '.nuxt',
+      'coverage', '.turbo', '.nx', '.cache', '.venv', 'venv', '__pycache__',
+      '__tests__', 'tests', 'test', 'vendor',
+    ]);
     try {
       for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
         const fullPath = path.join(dir, entry.name);
         if (entry.isDirectory()) {
-          if (!entry.name.startsWith('.') && entry.name !== 'node_modules' && entry.name !== 'dist') {
+          if (!entry.name.startsWith('.') && !skipDirs.has(entry.name)) {
             files.push(...this.walkDir(fullPath));
           }
         } else if (/\.(ts|tsx|js|jsx)$/.test(entry.name)) {

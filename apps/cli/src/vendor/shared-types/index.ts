@@ -248,22 +248,33 @@ export interface ModelInfo {
 }
 
 export const AVAILABLE_MODELS: ModelInfo[] = [
-  // NVIDIA (Free, no API key needed)
+  // NVIDIA (Free tier, set NVIDIA_API_KEY)
   { id: 'deepseek-ai/deepseek-v4-flash', name: 'DeepSeek V4 Flash', provider: 'nvidia', contextWindow: 131072, maxOutput: 8192, pricing: 'Free', recommended: true },
   { id: 'nvidia/llama-3.3-nemotron-super-49b-v1', name: 'Nemotron Super 49B', provider: 'nvidia', contextWindow: 128000, maxOutput: 8192, pricing: 'Free', recommended: false },
   { id: 'meta/llama-3.1-70b-instruct', name: 'Llama 3.1 70B', provider: 'nvidia', contextWindow: 128000, maxOutput: 4096, pricing: 'Free', recommended: false },
   // OpenAI (requires OPENAI_API_KEY)
-  { id: 'gpt-5.5', name: 'GPT-5.5', provider: 'openai', contextWindow: 128000, maxOutput: 16384, pricing: 'Check OpenAI pricing', recommended: true },
-  { id: 'gpt-5.5-pro', name: 'GPT-5.5 Pro', provider: 'openai', contextWindow: 128000, maxOutput: 16384, pricing: 'Check OpenAI pricing', recommended: false },
-  { id: 'gpt-5.4', name: 'GPT-5.4', provider: 'openai', contextWindow: 128000, maxOutput: 16384, pricing: 'Check OpenAI pricing', recommended: false },
-  { id: 'gpt-5.4-mini', name: 'GPT-5.4 Mini', provider: 'openai', contextWindow: 128000, maxOutput: 16384, pricing: 'Check OpenAI pricing', recommended: false },
-  { id: 'gpt-5-mini', name: 'GPT-5 Mini', provider: 'openai', contextWindow: 128000, maxOutput: 16384, pricing: 'Check OpenAI pricing', recommended: false },
-  { id: 'gpt-5', name: 'GPT-5', provider: 'openai', contextWindow: 128000, maxOutput: 16384, pricing: 'Check OpenAI pricing', recommended: false },
-  { id: 'gpt-4.1', name: 'GPT-4.1', provider: 'openai', contextWindow: 128000, maxOutput: 16384, pricing: 'Check OpenAI pricing', recommended: false },
-  { id: 'gpt-4o', name: 'GPT-4o', provider: 'openai', contextWindow: 128000, maxOutput: 16384, pricing: '$2.50/$10.00', recommended: false },
+  { id: 'gpt-4o', name: 'GPT-4o', provider: 'openai', contextWindow: 128000, maxOutput: 16384, pricing: '$2.50/$10.00', recommended: true },
   { id: 'gpt-4o-mini', name: 'GPT-4o Mini', provider: 'openai', contextWindow: 128000, maxOutput: 16384, pricing: '$0.15/$0.60', recommended: false },
-  { id: 'o3', name: 'o3', provider: 'openai', contextWindow: 200000, maxOutput: 100000, pricing: 'Check OpenAI pricing', recommended: false },
-  { id: 'o4-mini', name: 'o4 Mini', provider: 'openai', contextWindow: 200000, maxOutput: 100000, pricing: 'Check OpenAI pricing', recommended: false },
+  { id: 'o4-mini', name: 'o4 Mini', provider: 'openai', contextWindow: 200000, maxOutput: 100000, pricing: 'Reasoning', recommended: false },
+  { id: 'gpt-4.1', name: 'GPT-4.1', provider: 'openai', contextWindow: 128000, maxOutput: 16384, pricing: 'Check pricing', recommended: false },
+  // Groq (FREE, fast inference)
+  { id: 'llama-3.3-70b-versatile', name: 'Llama 3.3 70B', provider: 'groq', contextWindow: 131072, maxOutput: 8192, pricing: 'Free', recommended: true },
+  { id: 'llama-3.1-8b-instant', name: 'Llama 3.1 8B', provider: 'groq', contextWindow: 131072, maxOutput: 8192, pricing: 'Free', recommended: false },
+  { id: 'mixtral-8x7b-32768', name: 'Mixtral 8x7B', provider: 'groq', contextWindow: 32768, maxOutput: 4096, pricing: 'Free', recommended: false },
+  // Anthropic (requires ANTHROPIC_API_KEY)
+  { id: 'claude-sonnet-4-20250514', name: 'Claude Sonnet 4', provider: 'anthropic', contextWindow: 200000, maxOutput: 8192, pricing: '$3/$15', recommended: true },
+  { id: 'claude-haiku-3-5-20241022', name: 'Claude Haiku 3.5', provider: 'anthropic', contextWindow: 200000, maxOutput: 8192, pricing: '$0.80/$4.00', recommended: false },
+  // DeepSeek (requires DEEPSEEK_API_KEY)
+  { id: 'deepseek-chat', name: 'DeepSeek V3', provider: 'deepseek', contextWindow: 65536, maxOutput: 8192, pricing: '$0.27/$1.10', recommended: true },
+  { id: 'deepseek-reasoner', name: 'DeepSeek R1', provider: 'deepseek', contextWindow: 65536, maxOutput: 8192, pricing: '$0.55/$2.19', recommended: false },
+  // Together AI (requires TOGETHER_API_KEY)
+  { id: 'meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo', name: 'Llama 3.1 70B', provider: 'together', contextWindow: 131072, maxOutput: 8192, pricing: '$0.59/$0.59', recommended: true },
+  { id: 'mistralai/Mixtral-8x22B-Instruct-v0.1', name: 'Mixtral 8x22B', provider: 'together', contextWindow: 65536, maxOutput: 4096, pricing: '$1.20/$1.20', recommended: false },
+  // Ollama (Local — free)
+  { id: 'llama3.2', name: 'Llama 3.2', provider: 'ollama', contextWindow: 8192, maxOutput: 4096, pricing: 'Free', recommended: true },
+  { id: 'codellama', name: 'CodeLlama', provider: 'ollama', contextWindow: 16384, maxOutput: 4096, pricing: 'Free', recommended: false },
+  // LM Studio (Local — free)
+  { id: 'local-model', name: 'Local Model', provider: 'local-server', contextWindow: 8192, maxOutput: 4096, pricing: 'Free', recommended: true },
 ];
 
 export interface LLMConfig {

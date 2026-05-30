@@ -26,6 +26,12 @@ export interface ProjectAnalysis {
   summary: string;
 }
 
+export interface ProjectAnalysisCallbacks {
+  onProgress?: (message: string) => void;
+  onSummaryStart?: () => void;
+  onSummaryToken?: (token: string) => void;
+}
+
 export class ProjectAnalyzer extends BaseAgent {
   private static readonly ANALYSIS_PROMPT = `You are a senior software engineer analyzing a project.
 Your job is to:
@@ -123,20 +129,25 @@ Be precise and actionable.`;
     return keyFiles;
   }
 
-  async analyze(dirPath: string): Promise<ProjectAnalysis> {
+  async analyze(dirPath: string, callbacks: ProjectAnalysisCallbacks = {}): Promise<ProjectAnalysis> {
     const name = path.basename(dirPath);
-    const [structure, keyFiles] = await Promise.all([
-      this.scanDirectory(dirPath),
-      this.readKeyFiles(dirPath),
-    ]);
+    callbacks.onProgress?.(`Scanning file tree in ${name}`);
+    const structure = await this.scanDirectory(dirPath);
 
+    callbacks.onProgress?.(`Reading config and entry files`);
+    const keyFiles = await this.readKeyFiles(dirPath);
+
+    callbacks.onProgress?.('Detecting stack, entry points, and missing files');
     const techStack = this.detectTechStack(keyFiles);
     const entryPoints = this.findEntryPoints(keyFiles);
     const missingFiles = this.findMissingFiles(techStack, keyFiles);
+
+    callbacks.onProgress?.('Running static project checks');
     const issues: AnalysisIssue[] = this.staticAnalysis(keyFiles);
 
     let summary = '';
     try {
+      callbacks.onProgress?.('Generating AI project summary');
       const context = JSON.stringify({
         structure: structure.map(s => s.path.slice(dirPath.length + 1)),
         techStack,
@@ -144,8 +155,13 @@ Be precise and actionable.`;
         missingFiles,
         keyFiles: [...keyFiles.keys()],
       });
-      const result = await this.run('analyze', context);
-      summary = result.details;
+      if (callbacks.onSummaryToken) {
+        callbacks.onSummaryStart?.();
+        summary = await this.runStream('analyze', callbacks.onSummaryToken, context);
+      } else {
+        const result = await this.run('analyze', context);
+        summary = result.details;
+      }
     } catch {
       summary = `Project "${name}" with ${techStack.join(', ')}. ${keyFiles.size} key files found.`;
     }

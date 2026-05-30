@@ -103,14 +103,7 @@ export const TOOL_DEFINITIONS: ToolDef[] = [
   },
 ];
 
-const ALLOWED_BINS = new Set([
-  'npm', 'npx', 'node', 'git', 'pnpm', 'yarn', 'next', 'vite', 'tsc', 'eslint', 'prettier',
-  'find', 'ls', 'dir', 'cat', 'type', 'echo', 'python', 'python3', 'pip', 'pip3',
-  'powershell', 'pwsh', 'cmd', 'code', 'docker', 'docker-compose',
-  'gh', 'tar', 'unzip', 'gzip', 'mkdir', 'cp', 'mv', 'cd', 'touch', 'pwd', 'date', 'whoami',
-  'nslookup', 'ping', 'tracert', 'ipconfig', 'systeminfo',
-]);
-const BLOCKED_RE = [/rm\s+-rf/i, /sudo/i, /curl/i, /wget/i, />\s*\//i, /\|\s*(bash|sh|powershell)/i, /chmod/i, /chown/i, /mkfs/i, /dd\s+if/i, /:\(\)\s*\{/i];
+import { isAllowedBinary, BLOCKED_PATTERNS } from '../security/policy';
 
 export class ToolExecutor {
   private projectRoot: string;
@@ -352,10 +345,10 @@ export class ToolExecutor {
     const cmd = call.args.command;
     const parts = cmd.split(/\s+/);
     const first = parts[0];
-    if (!ALLOWED_BINS.has(first)) {
+    if (!isAllowedBinary(first)) {
       return { id: call.id, tool: call.tool, output: '', error: `Command "${first}" is not allowed` };
     }
-    for (const re of BLOCKED_RE) {
+    for (const re of BLOCKED_PATTERNS) {
       if (re.test(cmd)) {
         return { id: call.id, tool: call.tool, output: '', error: 'Command matches blocked pattern' };
       }

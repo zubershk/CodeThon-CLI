@@ -1,6 +1,6 @@
 {
   "name": "codethon-cli",
-  "version": "0.2.2",
+  "version": "1.0.0",
   "description": "AI-native execution orchestration for developers and hackathon builders — plan, build, debug, and ship from your terminal.",
   "bin": {
     "ct": "dist/index.js"
@@ -28,7 +28,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "prepublishOnly": "npm run build && npm run typecheck",
+    "prepublishOnly": "npm run build && npm run typecheck && npm test",
     "prepack": "npm run build"
   },
   "dependencies": {

@@ -1,14 +1,14 @@
-import inquirer from 'inquirer';
 import chalk from 'chalk';
 import type { CommandResult } from '@codethon/shared-types';
 import { DebugAgent } from '../agents/debug-agent';
 import { StateManager } from '../cil/state-manager';
 import { HealthScoreCalculator } from '../cil/health-score';
-import { createSpinner, logger } from '../utils';
+import { logger } from '../utils';
 import { parseBuildErrors, formatParsedErrors, generateFixSuggestions } from '../utils/error-parser';
 import { requireApproval } from '../utils/approval';
 import { TerminalPreview, renderTerminalBox, renderTerminalLine, renderTerminalClose } from '../utils/terminal-preview';
-import { renderAgentOutput } from '../utils/render';
+import { createMarkdownStreamRenderer } from '../utils/render';
+import { promptConfirm, promptInput } from '../utils/prompt';
 
 export async function debugCommand(errorInput?: string): Promise<CommandResult> {
   logger.section('CodeThon CLI — Debug Assistant');
@@ -53,19 +53,14 @@ export async function debugCommand(errorInput?: string): Promise<CommandResult> 
   }
 
   // Ask user for additional error context
-  const { extraContext } = await inquirer.prompt([
-    {
-      type: 'input',
-      name: 'extraContext',
-      message: 'Additional error context or the specific error message:',
-      default: parsedErrors.length > 0 ? parsedErrors[0].message : errorText.slice(0, 200),
-    },
-  ]);
+  const extraContext = await promptInput({
+    message: 'Additional error context or the specific error message',
+    defaultValue: parsedErrors.length > 0 ? parsedErrors[0].message : errorText.slice(0, 200),
+  });
 
   const agent = new DebugAgent();
   agent.setProjectRoot(process.cwd());
-  const spinner = createSpinner(chalk.yellow('Analyzing error with AI...'));
-  spinner.start();
+  const stream = createMarkdownStreamRenderer({ title: 'Debug Analysis' });
 
   try {
     const analysisContext = [
@@ -75,23 +70,16 @@ export async function debugCommand(errorInput?: string): Promise<CommandResult> 
       `Full build output:\n\`\`\`\n${errorText.slice(0, 3000)}\n\`\`\``,
     ].filter(Boolean).join('\n\n');
 
-    const output = await agent.run(analysisContext);
-
-    spinner.succeed('Analysis complete');
-    console.log('');
-    renderAgentOutput(output.details);
+    const analysis = await agent.runStream(analysisContext, token => stream.write(token));
+    stream.end();
     console.log('');
 
     // Offer to auto-fix via tool calling
     if (parsedErrors.length > 0) {
-      const { wantFix } = await inquirer.prompt([
-        {
-          type: 'confirm',
-          name: 'wantFix',
-          message: 'Attempt to auto-fix these errors?',
-          default: true,
-        },
-      ]);
+      const wantFix = await promptConfirm({
+        message: 'Attempt to auto-fix these errors?',
+        defaultValue: true,
+      });
 
       if (wantFix) {
         logger.info('');
@@ -120,10 +108,10 @@ export async function debugCommand(errorInput?: string): Promise<CommandResult> 
     return {
       success: true,
       message: 'Debug analysis complete',
-      data: { analysis: output.details, parsedErrors, suggestions },
+      data: { analysis, parsedErrors, suggestions },
     };
   } catch (error) {
-    spinner.fail('Failed to analyze error');
+    stream.end();
     logger.error(error instanceof Error ? error.message : String(error));
     return { success: false, message: 'Failed to analyze error' };
   }

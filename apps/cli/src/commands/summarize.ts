@@ -4,7 +4,7 @@ import { getLLMConfig, getCurrentProjectId } from '../utils/config';
 import { createProvider } from '@codethon/llm-client';
 import { startAgent, succeedAgent, failAgent } from '../utils/agent-feed';
 import { logger } from '../utils';
-import { renderAgentOutput } from '../utils/render';
+import { streamMarkdownResponse } from '../utils/llm-stream';
 import chalk from 'chalk';
 
 export async function summarizeCommand(): Promise<CommandResult> {
@@ -58,7 +58,7 @@ export async function summarizeCommand(): Promise<CommandResult> {
     const config = getLLMConfig();
     const provider = createProvider(config);
 
-    const response = await provider.generate({
+    const summary = await streamMarkdownResponse(provider, {
       messages: [
         {
           role: 'system',
@@ -80,7 +80,7 @@ Use markdown. Be direct — no fluff. Under 300 words.`,
       ],
       temperature: 0.2,
       maxTokens: 1500,
-    });
+    }, 'Project Summary');
 
     succeedAgent('Summary generated');
     console.log('');
@@ -94,10 +94,9 @@ Use markdown. Be direct — no fluff. Under 300 words.`,
     logger.labelValue('Outputs Generated', `${outputs}`);
     console.log('');
 
-    renderAgentOutput(response.content);
     console.log('');
 
-    return { success: true, message: 'Summary generated', data: { summary: response.content } };
+    return { success: true, message: 'Summary generated', data: { summary } };
   } catch (error) {
     failAgent(error instanceof Error ? error.message : 'Summary failed');
     logger.error(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);

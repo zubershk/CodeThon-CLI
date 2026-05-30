@@ -1,13 +1,14 @@
 import fs from 'fs';
 import path from 'path';
 import chalk from 'chalk';
-import inquirer from 'inquirer';
 import { spawnSync } from 'child_process';
 import type { CommandResult } from '@codethon/shared-types';
 import { createSpinner, logger } from '../utils';
+import { createMarkdownStreamRenderer } from '../utils/render';
 import { StateManager } from '../cil/state-manager';
 import { sanitizeEnv, resolveBin } from '../utils/env';
 import { formatApiError, isAuthError } from '../utils/api-error';
+import { promptConfirm, promptSelect } from '../utils/prompt';
 
 interface DeployResult {
   platform: string;
@@ -57,14 +58,10 @@ async function vercelDeploy(): Promise<DeployResult> {
   } catch { /* will install */ }
 
   if (!vercelCheck || vercelCheck.error || vercelCheck.status !== 0) {
-    const { install } = await inquirer.prompt([
-      {
-        type: 'confirm',
-        name: 'install',
-        message: 'Vercel CLI not found. Install it now?',
-        default: true,
-      },
-    ]);
+    const install = await promptConfirm({
+      message: 'Vercel CLI not found. Install it now?',
+      defaultValue: true,
+    });
     if (!install) {
       return { platform: 'Vercel', url: '', success: false, error: 'Vercel CLI not installed' };
     }
@@ -89,14 +86,10 @@ async function vercelDeploy(): Promise<DeployResult> {
   }
 
   if (hasBuildScript) {
-    const { build } = await inquirer.prompt([
-      {
-        type: 'confirm',
-        name: 'build',
-        message: 'Run npm run build before deploying?',
-        default: true,
-      },
-    ]);
+    const build = await promptConfirm({
+      message: 'Run npm run build before deploying?',
+      defaultValue: true,
+    });
 
     if (build) {
       const buildSpinner = createSpinner('Building project for production...');
@@ -151,32 +144,25 @@ export async function deployCommand(): Promise<CommandResult> {
   const state = new StateManager();
   const project = state.getProject();
 
-  const { action } = await inquirer.prompt([
-    {
-      type: 'list',
-      name: 'action',
-      message: 'What do you want to do?',
-      choices: [
-        { name: '  Deploy to Vercel', value: 'vercel' },
-        { name: '  Show deployment history', value: 'history' },
-        { name: '  Generate deployment guide', value: 'guide' },
-      ],
-    },
-  ]);
+  const action = await promptSelect({
+    message: 'What do you want to do?',
+    choices: [
+      { name: '  Deploy to Vercel', value: 'vercel' },
+      { name: '  Show deployment history', value: 'history' },
+      { name: '  Generate deployment guide', value: 'guide' },
+    ],
+  });
 
   if (action === 'guide') {
     const { DevOpsAgent } = await import('../agents/devops-agent');
     const agent = new DevOpsAgent();
-    const spinner = createSpinner('Generating deployment guide...');
-    spinner.start();
+    const stream = createMarkdownStreamRenderer({ title: 'Deployment Guide' });
     try {
-      const output = await agent.run('auto');
-      spinner.succeed('Deployment guide ready!');
-      logger.info('');
-      logger.outputBlock(output.details);
+      await agent.runStream('auto', token => stream.write(token));
+      stream.end();
       return { success: true, message: 'Deployment guide generated' };
     } catch (e: any) {
-      spinner.fail('AI guide unavailable');
+      stream.end();
       const errMsg = e.message || String(e);
       if (isAuthError(e)) {
         logger.error(formatApiError(e));
@@ -211,9 +197,10 @@ export async function deployCommand(): Promise<CommandResult> {
 
   if (!project) {
     logger.warn('No active project. Run `ct init` first to set up project tracking.');
-    const { proceed } = await inquirer.prompt([
-      { type: 'confirm', name: 'proceed', message: 'Continue without project tracking?', default: true },
-    ]);
+    const proceed = await promptConfirm({
+      message: 'Continue without project tracking?',
+      defaultValue: true,
+    });
     if (!proceed) return { success: false, message: 'Cancelled' };
   }
 

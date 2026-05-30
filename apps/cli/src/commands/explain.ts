@@ -5,7 +5,7 @@ import { createProvider } from '@codethon/llm-client';
 import { getLLMConfig } from '../utils/config';
 import { startAgent, succeedAgent, failAgent } from '../utils/agent-feed';
 import { logger } from '../utils';
-import { renderAgentOutput } from '../utils/render';
+import { streamMarkdownResponse } from '../utils/llm-stream';
 
 export async function explainCommand(filePath: string): Promise<CommandResult> {
   logger.section(`CodeThon CLI — Explain: ${filePath}`);
@@ -26,7 +26,7 @@ export async function explainCommand(filePath: string): Promise<CommandResult> {
     const config = getLLMConfig();
     const provider = createProvider(config);
 
-    const response = await provider.generate({
+    const analysis = await streamMarkdownResponse(provider, {
       messages: [
         {
           role: 'system',
@@ -49,14 +49,12 @@ Format with markdown headings and bullet points. Keep it under 500 words.`,
       ],
       temperature: 0.2,
       maxTokens: 2000,
-    });
+    }, 'File Explanation');
 
     succeedAgent(`Analysis complete for ${filePath}`);
     console.log('');
-    renderAgentOutput(response.content);
-    console.log('');
 
-    return { success: true, message: 'File explained', data: { file: filePath, analysis: response.content } };
+    return { success: true, message: 'File explained', data: { file: filePath, analysis } };
   } catch (error) {
     failAgent(error instanceof Error ? error.message : 'Analysis failed');
     logger.error(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);

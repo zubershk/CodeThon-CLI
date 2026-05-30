@@ -1,10 +1,9 @@
-import chalk from 'chalk';
 import type { CommandResult } from '@codethon/shared-types';
 import { LaunchAgent } from '../agents/launch-agent';
 import { StateManager } from '../cil/state-manager';
 import { HealthScoreCalculator } from '../cil/health-score';
-import { createSpinner, logger } from '../utils';
-import { renderAgentOutput } from '../utils/render';
+import { logger } from '../utils';
+import { createMarkdownStreamRenderer } from '../utils/render';
 
 export async function launchCommand(): Promise<CommandResult> {
   logger.section('CodeThon CLI — Launch Assets');
@@ -17,27 +16,20 @@ export async function launchCommand(): Promise<CommandResult> {
   }
 
   const agent = new LaunchAgent();
-  const spinner = createSpinner(chalk.bold.yellow('Generating launch assets...'));
-  spinner.start();
+  const stream = createMarkdownStreamRenderer({ title: 'Launch Assets' });
 
   try {
-    let started = false;
     let full = '';
 
     await agent.runStream(
       `Project: ${project.idea}\nStack: ${project.stack}`,
       (token) => {
-        if (!started) {
-          started = true;
-          spinner.stop();
-          process.stdout.write('\n');
-        }
         full += token;
+        stream.write(token);
       }
     );
+    stream.end();
 
-    process.stdout.write('\n');
-    renderAgentOutput(full);
     process.stdout.write('\n');
 
     state.updateProject({ sprintPhase: 'launching' });
@@ -48,7 +40,7 @@ export async function launchCommand(): Promise<CommandResult> {
 
     return { success: true, message: 'Launch assets generated', data: { assets: full } };
   } catch (error) {
-    spinner.fail('Failed to generate launch assets');
+    stream.end();
     logger.error(error instanceof Error ? error.message : String(error));
     return { success: false, message: 'Failed to generate launch assets' };
   }

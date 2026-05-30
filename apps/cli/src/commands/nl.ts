@@ -1,9 +1,9 @@
 import { createProvider } from '@codethon/llm-client';
 import type { LLMMessage } from '@codethon/llm-client';
-import { getLLMConfig } from '../utils/config';
+import { getLLMConfig, validateProviderConfig } from '../utils/config';
 import { StateManager } from '../cil/state-manager';
 import { logger, createSpinner } from '../utils';
-import { renderAgentOutput } from '../utils/render';
+import { streamMarkdownResponse } from '../utils/llm-stream';
 import { searchWeb, crawlUrl } from '../utils/web-search';
 import { formatApiError } from '../utils/api-error';
 
@@ -64,6 +64,8 @@ export async function naturalLanguageCommand(input: string) {
   spinner.start();
 
   try {
+    const check = validateProviderConfig();
+    if (!check.ok) { spinner.fail(check.message); return { success: false, message: check.message, data: null }; }
     const config = getLLMConfig();
     const provider = createProvider(config);
 
@@ -91,13 +93,12 @@ If the user asks about something you don't know, ask if they want you to search 
       { role: 'user', content: input },
     ];
 
-    const response = await provider.generate({ messages, temperature: 0.3, maxTokens: 4000 });
-    spinner.succeed('Done');
+    spinner.stop();
     console.log('');
-    renderAgentOutput(response.content);
+    const response = await streamMarkdownResponse(provider, { messages, temperature: 0.3, maxTokens: 4000 }, 'Answer');
     console.log('');
 
-    return { success: true, message: 'Query answered', data: { response: response.content } };
+    return { success: true, message: 'Query answered', data: { response } };
   } catch (error) {
     spinner.fail('Failed to process query');
     const config = getLLMConfig();

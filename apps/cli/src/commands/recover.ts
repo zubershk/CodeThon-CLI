@@ -6,7 +6,7 @@ import { createProvider } from '@codethon/llm-client';
 import { getLLMConfig } from '../utils/config';
 import { startAgent, succeedAgent, failAgent } from '../utils/agent-feed';
 import { logger } from '../utils';
-import { renderAgentOutput } from '../utils/render';
+import { streamMarkdownResponse } from '../utils/llm-stream';
 
 const SKIP_DIRS = new Set(['node_modules', '.git', '.next', 'dist', 'build', 'out', 'coverage', '.cache', '__pycache__', '.venv']);
 
@@ -76,7 +76,7 @@ export async function recoverCommand(): Promise<CommandResult> {
       totalFilesFound: files.length,
     };
 
-    const response = await provider.generate({
+    const recovery = await streamMarkdownResponse(provider, {
       messages: [
         {
           role: 'system',
@@ -98,11 +98,9 @@ Be concise. Use markdown. Under 400 words.`,
       ],
       temperature: 0.2,
       maxTokens: 2000,
-    });
+    }, 'Recovery Report');
 
     succeedAgent('Context rebuilt');
-    console.log('');
-    renderAgentOutput(response.content);
     console.log('');
 
     // If project exists, update its state
@@ -119,7 +117,7 @@ Be concise. Use markdown. Under 400 words.`,
       });
     }
 
-    return { success: true, message: 'Recovery complete', data: { recovery: response.content } };
+    return { success: true, message: 'Recovery complete', data: { recovery } };
   } catch (error) {
     failAgent(error instanceof Error ? error.message : 'Recovery failed');
     logger.error(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);

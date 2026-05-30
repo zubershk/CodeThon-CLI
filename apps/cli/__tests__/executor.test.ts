@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { isCommandAllowed, executeCommand } from '../src/runtime/executor';
+import { isAllowedCommand as isCommandAllowed } from '../src/security/policy';
+import { executeCommand } from '../src/runtime/executor';
 
 describe('Executor - command validation', () => {
   it('should allow npm commands', () => {

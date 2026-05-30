@@ -3,9 +3,10 @@ import path from 'path';
 import chalk from 'chalk';
 import { execSync } from 'child_process';
 import type { CommandResult } from '@codethon/shared-types';
-import { StateManager } from '../cil/state-manager';
-import { startAgent, succeedAgent, failAgent } from '../utils/agent-feed';
 import { logger } from '../utils';
+import { getLLMConfig } from '../utils/config';
+import { PROVIDER_SETUP } from '../utils/api-error';
+import { printActionHints, printHero } from '../utils/experience';
 
 interface DoctorCheck {
   name: string;
@@ -14,189 +15,289 @@ interface DoctorCheck {
   fix?: string;
 }
 
-function checkNodeVersion(): DoctorCheck {
+interface PackageCandidate {
+  root: string;
+  pkg: Record<string, any>;
+}
+
+function readPackage(root: string): PackageCandidate | null {
+  const packagePath = path.join(root, 'package.json');
+  if (!fs.existsSync(packagePath)) return null;
+  try {
+    return { root, pkg: JSON.parse(fs.readFileSync(packagePath, 'utf-8')) };
+  } catch {
+    return { root, pkg: {} };
+  }
+}
+
+function dependencyCount(pkg: Record<string, any>): number {
+  return Object.keys(pkg.dependencies || {}).length + Object.keys(pkg.devDependencies || {}).length;
+}
+
+function detectPackageRoot(): PackageCandidate | null {
+  const cwd = process.cwd();
+  const current = readPackage(cwd);
+  if (!current) return null;
+
+  const currentDeps = dependencyCount(current.pkg);
+  const currentHasBuildSignal = Boolean(
+    current.pkg.scripts?.build ||
+    current.pkg.scripts?.test ||
+    current.pkg.scripts?.typecheck ||
+    fs.existsSync(path.join(cwd, 'tsconfig.json')) ||
+    fs.existsSync(path.join(cwd, 'vite.config.ts')) ||
+    fs.existsSync(path.join(cwd, 'vite.config.js')) ||
+    fs.existsSync(path.join(cwd, 'next.config.ts')) ||
+    fs.existsSync(path.join(cwd, 'next.config.js')),
+  );
+
+  if (currentDeps > 0) return current;
+
+  const nestedRoots = [
+    path.join(cwd, 'apps', 'cli'),
+    path.join(cwd, 'packages', 'cli'),
+    path.join(cwd, 'cli'),
+    path.join(cwd, 'app'),
+  ];
+
+  for (const root of nestedRoots) {
+    const nested = readPackage(root);
+    if (nested && dependencyCount(nested.pkg) > 0) return nested;
+  }
+
+  if (currentHasBuildSignal) return current;
+  return current;
+}
+
+function relativeRoot(root: string): string {
+  const relative = path.relative(process.cwd(), root);
+  return relative || '.';
+}
+
+function checkNode(): DoctorCheck {
   const v = process.version.slice(1);
   const major = parseInt(v.split('.')[0], 10);
   if (major >= 18) {
-    return { name: 'Node.js Version', status: 'pass', message: `${v} (${major >= 20 ? 'latest' : 'supported'})` };
+    return { name: 'Node.js installed', status: 'pass', message: `${v}` };
   }
-  return { name: 'Node.js Version', status: 'fail', message: `${v} — need >= 18`, fix: 'Install Node.js 18+ from https://nodejs.org' };
+  return { name: 'Node.js installed', status: 'fail', message: `${v} (need 18+)`, fix: 'Install Node.js 18+ from https://nodejs.org' };
 }
 
-function checkPackageJson(): DoctorCheck[] {
-  if (!fs.existsSync('package.json')) {
-    return [{ name: 'package.json', status: 'fail', message: 'Not found', fix: 'Run `npm init` or `ct init`' }];
-  }
+function checkGit(): DoctorCheck {
   try {
-    const pkg = JSON.parse(fs.readFileSync('package.json', 'utf-8'));
-    const checks: DoctorCheck[] = [];
-    checks.push({ name: 'package.json', status: 'pass', message: 'Valid JSON' });
-
-    const deps = { ...pkg.dependencies, ...pkg.devDependencies };
-    const total = Object.keys(deps).length;
-    if (total === 0) {
-      checks.push({ name: 'Dependencies', status: 'warn', message: 'No dependencies declared', fix: 'Run `npm install <package>`' });
-    } else {
-      checks.push({ name: 'Dependencies', status: 'pass', message: `${total} packages declared` });
-    }
-
-    if (!pkg.scripts?.build) {
-      checks.push({ name: 'Build Script', status: 'warn', message: 'No "build" script defined', fix: 'Add "build" to package.json scripts' });
-    } else {
-      checks.push({ name: 'Build Script', status: 'pass', message: `"${pkg.scripts.build}"` });
-    }
-
-    return checks;
+    const v = execSync('git --version', { encoding: 'utf-8', timeout: 5000 }).trim();
+    return { name: 'Git installed', status: 'pass', message: v };
   } catch {
-    return [{ name: 'package.json', status: 'fail', message: 'Invalid JSON', fix: 'Fix syntax errors in package.json' }];
+    return { name: 'Git installed', status: 'fail', message: 'Not found', fix: 'Install Git from https://git-scm.com' };
   }
 }
 
-function checkEnv(): DoctorCheck[] {
-  const checks: DoctorCheck[] = [];
-  const envFiles = ['.env', '.env.local', '.env.example'];
-  const found = envFiles.filter(f => fs.existsSync(f));
-  if (found.length > 0) {
-    checks.push({ name: 'Environment Files', status: 'pass', message: found.join(', ') });
-  } else {
-    checks.push({ name: 'Environment Files', status: 'warn', message: 'No .env files found', fix: 'Create .env.local for local environment variables' });
-  }
-
-  // Check for common env vars referenced in code
+function checkConfig(): DoctorCheck {
   try {
-    const srcDir = fs.existsSync('src') ? 'src' : '.';
-    const files = findAllFiles(srcDir, ['.ts', '.tsx', '.js', '.jsx']);
-    const envRefs = new Set<string>();
-    for (const f of files) {
-      const content = fs.readFileSync(f, 'utf-8');
-      const matches = content.match(/process\.env\.([A-Z_]+)/g);
-      if (matches) matches.forEach(m => envRefs.add(m.replace('process.env.', '')));
+    const config = getLLMConfig();
+    if (config.provider && config.model) {
+      return { name: 'Config valid', status: 'pass', message: `${config.provider}/${config.model}` };
     }
-    if (envRefs.size > 0) {
-      const actualEnv = loadEnvVars();
-      const missing = [...envRefs].filter(v => !actualEnv.has(v));
-      if (missing.length > 0) {
-        checks.push({ name: 'Missing Env Vars', status: 'warn', message: `${missing.length} referenced but not set: ${missing.slice(0, 5).join(', ')}${missing.length > 5 ? '...' : ''}`, fix: `Add to .env.local: ${missing[0]}=your_value` });
-      } else {
-        checks.push({ name: 'Environment Variables', status: 'pass', message: `${envRefs.size} referenced, all set` });
-      }
-    }
-  } catch {
-    // skip env var check on error
-  }
-
-  return checks;
-}
-
-function checkConfigFiles(): DoctorCheck[] {
-  const checks: DoctorCheck[] = [];
-  const configs = [
-    { file: 'tsconfig.json', name: 'TypeScript Config' },
-    { file: 'next.config.js', name: 'Next.js Config' },
-    { file: 'next.config.ts', name: 'Next.js Config' },
-    { file: 'tailwind.config.js', name: 'Tailwind Config' },
-    { file: 'tailwind.config.ts', name: 'Tailwind Config' },
-  ];
-  const found: string[] = [];
-  for (const c of configs) {
-    if (fs.existsSync(c.file)) found.push(c.name);
-  }
-  if (found.length > 0) {
-    checks.push({ name: 'Config Files', status: 'pass', message: found.join(', ') });
-  } else {
-    checks.push({ name: 'Config Files', status: 'warn', message: 'No framework configs detected' });
-  }
-  return checks;
-}
-
-function checkTypeScript(): DoctorCheck[] {
-  if (!fs.existsSync('tsconfig.json')) return [];
-  try {
-    execSync('npx tsc --noEmit 2>&1', { timeout: 30000, encoding: 'utf-8' });
-    return [{ name: 'TypeScript', status: 'pass', message: 'No errors' }];
+    return { name: 'Config valid', status: 'warn', message: 'Incomplete', fix: 'Run ct auth add' };
   } catch (e: any) {
-    const stderr = e.stderr || e.stdout || '';
-    const lines = stderr.split('\n').filter((l: string) => l.includes('error'));
-    return [{ name: 'TypeScript', status: 'warn', message: `${lines.length} error(s)`, fix: 'Run `npx tsc --noEmit` to see details, then `ct autofix`' }];
+    return { name: 'Config valid', status: 'fail', message: e.message, fix: 'Run ct onboard --reset' };
   }
 }
 
-function findAllFiles(dir: string, exts: string[]): string[] {
-  const results: string[] = [];
+function checkSecretBackend(): DoctorCheck {
   try {
-    const entries = fs.readdirSync(dir, { withFileTypes: true });
-    for (const e of entries) {
-      if (e.name.startsWith('.') || e.name === 'node_modules' || e.name === 'dist') continue;
-      const full = path.join(dir, e.name);
-      if (e.isDirectory()) results.push(...findAllFiles(full, exts));
-      else if (exts.some(ext => e.name.endsWith(ext))) results.push(full);
-    }
-  } catch { /* skip */ }
-  return results;
+    const { getSecretBackendName } = require('../utils/keychain');
+    const name = getSecretBackendName();
+    return { name: 'Secret storage', status: 'pass', message: name };
+  } catch {
+    return { name: 'Secret storage', status: 'warn', message: 'File-based fallback' };
+  }
 }
 
-function loadEnvVars(): Set<string> {
-  const vars = new Set<string>();
-  const envFiles = ['.env.local', '.env'];
-  for (const f of envFiles) {
-    if (fs.existsSync(f)) {
-      try {
-        const content = fs.readFileSync(f, 'utf-8');
-        for (const line of content.split('\n')) {
-          const match = line.match(/^([A-Z_]+)=/);
-          if (match) vars.add(match[1]);
-        }
-      } catch { /* skip */ }
+async function checkAuth(): Promise<DoctorCheck> {
+  const config = getLLMConfig();
+  const setup = PROVIDER_SETUP[config.provider];
+
+  if (!setup) {
+    return { name: `${config.provider} key valid`, status: 'warn', message: 'Unknown provider' };
+  }
+
+  if (!setup.envVar) {
+    // Local provider
+    try {
+      const url = config.provider === 'ollama' ? 'http://localhost:11434' : 'http://localhost:1234';
+      const res = await fetch(url, { signal: AbortSignal.timeout(3000) });
+      if (res.ok) return { name: `${config.provider} running`, status: 'pass', message: 'Connected' };
+      return { name: `${config.provider} running`, status: 'fail', message: 'Not responding', fix: `Start ${config.provider}` };
+    } catch {
+      return { name: `${config.provider} running`, status: 'fail', message: 'Not reachable', fix: `Start ${config.provider}` };
     }
   }
-  return vars;
+
+  const apiKey = process.env[setup.envVar] || config.apiKey;
+  if (!apiKey) {
+    return { name: `${config.provider} key valid`, status: 'fail', message: 'Not set', fix: 'Run ct auth add' };
+  }
+
+  const urls: Record<string, string> = {
+    openai: 'https://api.openai.com/v1/models',
+    anthropic: 'https://api.anthropic.com/v1/messages',
+    groq: 'https://api.groq.com/openai/v1/models',
+    nvidia: 'https://integrate.api.nvidia.com/v1/models',
+    deepseek: 'https://api.deepseek.com/v1/models',
+    together: 'https://api.together.ai/v1/models',
+  };
+
+  const url = urls[config.provider];
+  if (!url) return { name: `${config.provider} key valid`, status: 'warn', message: 'No test endpoint' };
+
+  try {
+    const headers: Record<string, string> = { 'Authorization': `Bearer ${apiKey}` };
+    if (config.provider === 'anthropic') {
+      headers['x-api-key'] = apiKey;
+      headers['anthropic-version'] = '2023-06-01';
+    }
+    const res = await fetch(url, { headers, signal: AbortSignal.timeout(10000) });
+    if (res.ok) return { name: `${config.provider} key valid`, status: 'pass', message: 'Authenticated' };
+    if (res.status === 401 || res.status === 403) {
+      return { name: `${config.provider} key valid`, status: 'fail', message: 'Invalid key', fix: 'Run ct auth add' };
+    }
+    if (res.status === 429) {
+      return { name: `${config.provider} key valid`, status: 'warn', message: 'Rate limited' };
+    }
+    return { name: `${config.provider} key valid`, status: 'warn', message: `HTTP ${res.status}` };
+  } catch {
+    return { name: `${config.provider} key valid`, status: 'fail', message: 'Connection failed', fix: 'Check internet connection' };
+  }
+}
+
+function checkNetwork(): DoctorCheck {
+  try {
+    const command = process.platform === 'win32'
+      ? 'ping -n 1 -w 3000 1.1.1.1'
+      : 'ping -c 1 -W 3 1.1.1.1';
+    execSync(command, { encoding: 'utf-8', timeout: 5000, stdio: 'ignore' });
+    return { name: 'Internet available', status: 'pass', message: 'Connected' };
+  } catch {
+    return { name: 'Internet available', status: 'warn', message: 'Not reachable', fix: 'Check network connection' };
+  }
+}
+
+function checkProject(): DoctorCheck[] {
+  const checks: DoctorCheck[] = [];
+  const candidate = detectPackageRoot();
+  if (!candidate) {
+    checks.push({ name: 'Project detected', status: 'warn', message: 'No package.json', fix: 'Run /init' });
+    return checks;
+  }
+  const projectRoot = candidate.root;
+  const pkg = candidate.pkg;
+  const rootLabel = relativeRoot(projectRoot);
+  checks.push({ name: 'Project detected', status: 'pass', message: rootLabel === '.' ? 'package.json found' : `package.json found in ${rootLabel}` });
+
+  try {
+    const deps = dependencyCount(pkg);
+    checks.push({ name: 'Dependencies', status: deps > 0 ? 'pass' : 'warn', message: deps > 0 ? `${deps} packages` : 'None declared', fix: deps > 0 ? undefined : 'Run npm install <package>' });
+  } catch {
+    checks.push({ name: 'package.json', status: 'fail', message: 'Invalid JSON', fix: 'Fix package.json syntax' });
+  }
+
+  // Check for npm install
+  if (fs.existsSync(path.join(projectRoot, 'node_modules')) || fs.existsSync(path.join(process.cwd(), 'node_modules'))) {
+    checks.push({ name: 'node_modules', status: 'pass', message: 'Installed' });
+  } else {
+    checks.push({ name: 'node_modules', status: 'warn', message: 'Not installed', fix: rootLabel === '.' ? 'Run npm install' : `Run npm install in ${rootLabel}` });
+  }
+
+  // Detect build tool
+  const hasTsConfig = fs.existsSync(path.join(projectRoot, 'tsconfig.json')) || Boolean(pkg.devDependencies?.typescript || pkg.dependencies?.typescript);
+  const hasNext = fs.existsSync(path.join(projectRoot, 'next.config.js')) || fs.existsSync(path.join(projectRoot, 'next.config.ts')) || Boolean(pkg.dependencies?.next || pkg.devDependencies?.next);
+  const hasVite = fs.existsSync(path.join(projectRoot, 'vite.config.ts')) || fs.existsSync(path.join(projectRoot, 'vite.config.js')) || Boolean(pkg.dependencies?.vite || pkg.devDependencies?.vite);
+  const hasBuildScript = Boolean(pkg.scripts?.build);
+  if (hasNext) checks.push({ name: 'Build tool detected', status: 'pass', message: 'Next.js' });
+  else if (hasVite) checks.push({ name: 'Build tool detected', status: 'pass', message: 'Vite' });
+  else if (hasTsConfig) checks.push({ name: 'Build tool detected', status: 'pass', message: 'TypeScript' });
+  else if (hasBuildScript) checks.push({ name: 'Build tool detected', status: 'pass', message: 'package build script' });
+  else checks.push({ name: 'Build tool detected', status: 'warn', message: 'Not detected' });
+
+  return checks;
 }
 
 export async function doctorCommand(): Promise<CommandResult> {
-  logger.section('CodeThon CLI — Doctor');
+  printHero(
+    'CodeThon Doctor',
+    'Checks your local environment, project setup, provider access, and secret storage.',
+    'warning',
+    'Diagnostics',
+  );
 
-  const state = new StateManager();
-  const project = state.getProject();
-  if (project) {
-    startAgent('Doctor', 'Running project diagnostics...');
-  } else {
-    startAgent('Doctor', 'Running environment diagnostics...');
-  }
+  const checks: DoctorCheck[] = [];
 
-  const checks: DoctorCheck[] = [
-    checkNodeVersion(),
-    ...checkPackageJson(),
-    ...checkEnv(),
-    ...checkConfigFiles(),
-    ...checkTypeScript(),
-  ];
+  // Sync checks
+  checks.push(checkNode());
+  checks.push(checkGit());
+  checks.push(checkConfig());
+  checks.push(checkSecretBackend());
+  checks.push(checkNetwork());
+  checks.push(...checkProject());
 
-  succeedAgent('Diagnostics complete');
-  console.log('');
+  // Auth check (async — run inline)
+  const authCheck = await checkAuth();
+  checks.push(authCheck);
 
+  // Render
   const pass = checks.filter(c => c.status === 'pass');
   const warn = checks.filter(c => c.status === 'warn');
   const fail = checks.filter(c => c.status === 'fail');
 
-  for (const c of pass) {
-    console.log(`  ${chalk.greenBright('\u2713')} ${chalk.whiteBright(c.name)}: ${chalk.gray(c.message)}`);
-  }
-  for (const c of warn) {
-    console.log(`  ${chalk.yellowBright('\u26A0')} ${chalk.whiteBright(c.name)}: ${chalk.gray(c.message)}`);
-    if (c.fix) console.log(`    ${chalk.dim('Fix:')} ${chalk.yellowBright(c.fix)}`);
-  }
-  for (const c of fail) {
-    console.log(`  ${chalk.redBright('\u2717')} ${chalk.whiteBright(c.name)}: ${chalk.gray(c.message)}`);
-    if (c.fix) console.log(`    ${chalk.dim('Fix:')} ${chalk.redBright(c.fix)}`);
+  for (const c of checks) {
+    const icon = c.status === 'pass' ? chalk.green('\u2713')
+      : c.status === 'warn' ? chalk.yellow('\u26A0')
+      : chalk.red('\u2717');
+    const name = c.status === 'pass' ? chalk.white(c.name)
+      : c.status === 'warn' ? chalk.white(c.name)
+      : chalk.white(c.name);
+    const msg = chalk.dim(c.message);
+    console.log(`  ${icon} ${name}  ${msg}`);
+    if (c.fix && c.status !== 'pass') {
+      console.log(`     ${chalk.dim('Fix:')} ${chalk.cyan(c.fix)}`);
+    }
   }
 
   console.log('');
-  logger.resultSummary('Health Report', [
-    `${chalk.greenBright(`${pass.length} passed`)}`,
-    `${chalk.yellowBright(`${warn.length} warnings`)}`,
-    `${chalk.redBright(`${fail.length} failures`)}`,
-    `${chalk.whiteBright(`Total: ${checks.length} checks`)}`,
-  ]);
+  if (fail.length === 0 && warn.length === 0) {
+    logger.success('All checks passed. Ready to build.');
+  } else if (fail.length === 0) {
+    logger.success(`${pass.length} passed, ${warn.length} warnings. Ready to build.`);
+  } else {
+    logger.resultSummary('Health Report', [
+      `${chalk.green(`${pass.length} passed`)}`,
+      `${chalk.yellow(`${warn.length} warnings`)}`,
+      `${chalk.red(`${fail.length} failures`)}`,
+    ]);
+    console.log('');
+    logger.info(`  ${chalk.dim('Fix the failures above, then run')} ${chalk.cyanBright('ct doctor')} ${chalk.dim('again.')}`);
+  }
+
+  const actions = fail.length > 0
+    ? [
+        { command: 'auth add', description: 'Reconnect your provider if credentials are missing or invalid.' },
+        { command: 'doctor', description: 'Run diagnostics again after fixing the failures.' },
+        { command: 'onboard --reset', description: 'Use the guided setup if config is inconsistent.' },
+      ]
+    : warn.length > 0
+      ? [
+          { command: 'status', description: 'Review your current project, provider, and model state.' },
+          { command: 'plan', description: 'Start planning once the warnings are acceptable.' },
+          { command: 'execute "<goal>"', description: 'Run a concrete task when you are ready.' },
+        ]
+      : [
+          { command: 'plan', description: 'Turn your goal into a roadmap and architecture.' },
+          { command: 'execute "<goal>"', description: 'Have CodeThon implement a concrete task.' },
+          { command: 'review', description: 'Inspect the working tree before shipping changes.' },
+        ];
+
+  printActionHints('Recommended next actions', actions, '/');
 
   return { success: fail.length === 0, message: `${checks.length} checks: ${pass.length} passed, ${warn.length} warnings, ${fail.length} failures` };
 }

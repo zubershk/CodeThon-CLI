@@ -1,121 +1,304 @@
 import chalk from 'chalk';
-import fs from 'fs';
-import path from 'path';
-import os from 'os';
 import type { CommandResult } from '@codethon/shared-types';
-import { OnboardingWizard } from '../features/onboarding';
 import { logger } from '../utils';
-import { hasAnyApiKey } from '../utils/api-error';
+import { setLLMConfig, getLLMConfig } from '../utils/config';
+import { PROVIDER_SETUP } from '../utils/api-error';
+import { printActionHints, printHero } from '../utils/experience';
+import { formatContextWindow, getModelsForProvider, getProviderProfile, PROVIDER_ORDER } from '../utils/provider-catalog';
+import { promptConfirm, promptInput, promptSelect } from '../utils/prompt';
 
-export async function onboardCommand(): Promise<CommandResult> {
-  const wizard = new OnboardingWizard();
+interface ProviderChoice {
+  name: string;
+  value: string;
+  short: string;
+}
 
-  if (wizard.isComplete() && hasAnyApiKey()) {
-    const step = wizard.currentStep();
-    logger.info(`Setup already complete (step ${step})`);
-    logger.info(`Run ${chalk.cyanBright('/model')} to change AI models`);
-    logger.info(`Run ${chalk.cyanBright('/onboard --reset')} to re-run setup`);
-    return { success: true, message: 'Already onboarded' };
-  }
-
-  logger.section('CodeThon Setup');
-  console.log('');
-  logger.info('Checking your environment...');
-
-  // Check available API keys
-  const keyChecks = [
-    { name: 'NVIDIA (FREE)', env: 'NVIDIA_API_KEY', url: 'https://build.nvidia.com' },
-    { name: 'Groq (FREE)', env: 'GROQ_API_KEY', url: 'https://console.groq.com/keys' },
-    { name: 'OpenAI', env: 'OPENAI_API_KEY', url: 'https://platform.openai.com/api-keys' },
-    { name: 'Anthropic', env: 'ANTHROPIC_API_KEY', url: 'https://console.anthropic.com/settings/keys' },
-    { name: 'DeepSeek', env: 'DEEPSEEK_API_KEY', url: 'https://platform.deepseek.com/api_keys' },
-    { name: 'Together AI', env: 'TOGETHER_API_KEY', url: 'https://api.together.ai/settings/api-keys' },
-  ];
-
-  const found: string[] = [];
-  const missing: string[] = [];
-
-  for (const k of keyChecks) {
-    if (process.env[k.env]) {
-      found.push(k.env);
-      logger.info(`  ${chalk.greenBright('\u2713')} ${k.name} ${chalk.dim('(' + k.env + ' is set)')}`);
-    } else {
-      missing.push(k.env);
-      logger.info(`  ${chalk.dim('\u25CB')} ${k.name} — ${chalk.yellowBright(k.env)} not set`);
-      logger.info(`    ${chalk.dim('Get a key:')} ${chalk.cyanBright(k.url)}`);
-    }
-  }
-
-  // Check local models
-  const hasOllama = await checkLocalServer('http://localhost:11434');
-  const hasLmStudio = await checkLocalServer('http://localhost:1234');
-  if (hasOllama) logger.info(`  ${chalk.greenBright('\u2713')} Ollama ${chalk.dim('(running on localhost:11434)')}`);
-  if (hasLmStudio) logger.info(`  ${chalk.greenBright('\u2713')} LM Studio ${chalk.dim('(running on localhost:1234)')}`);
-  if (!hasOllama && !hasLmStudio && found.length === 0 && missing.length === keyChecks.length) {
-    logger.info(`  ${chalk.dim('\u25CB')} No API keys or local servers found`);
-    logger.info(`    ${chalk.dim('Get a free NVIDIA API key:')} ${chalk.cyanBright('https://build.nvidia.com')}`);
-    logger.info(`    ${chalk.dim('Or install Ollama:')} ${chalk.cyanBright('https://ollama.ai')}`);
-    logger.info(`    ${chalk.dim('Or get a free Groq API key:')} ${chalk.cyanBright('https://console.groq.com/keys')}`);
-  }
-
-  // Show which commands work without AI
-  if (found.length === 0 && !hasOllama && !hasLmStudio) {
-    console.log('');
-    logger.info(chalk.bold('Set an API key now:'));
-    for (const k of keyChecks) {
-      logger.info(`  ${chalk.cyanBright(`$env:${k.env}="<your-key>"`)}  ${chalk.dim(`(PowerShell)`)}`);
-      logger.info(`  ${chalk.cyanBright(`set ${k.env}=<your-key>`)}        ${chalk.dim(`(CMD)`)}`);
-      logger.info(`  ${chalk.dim(`Get key:`)} ${chalk.cyanBright(k.url)}`);
-      logger.info('');
-    }
-    console.log('');
-    logger.info(chalk.bold('Commands that work without an API key:'));
-    logger.info(`  ${chalk.cyanBright('ct init')}      ${chalk.dim('- Configure your project')}`);
-    logger.info(`  ${chalk.cyanBright('ct model')}     ${chalk.dim('- Switch AI models/providers')}`);
-    logger.info(`  ${chalk.cyanBright('ct scaffold')}  ${chalk.dim('- Generate project template files')}`);
-    logger.info(`  ${chalk.cyanBright('ct doctor')}    ${chalk.dim('- System diagnostics (Node, TS, configs)')}`);
-    logger.info(`  ${chalk.cyanBright('ct status')}    ${chalk.dim('- View project config and health')}`);
-    logger.info(`  ${chalk.cyanBright('ct deploy')}    ${chalk.dim('- Deploy to Vercel')}`);
-    logger.info(`  ${chalk.cyanBright('ct review')}    ${chalk.dim('- Git diff review')}`);
-  }
-
-  // Create .codethon config dir
-  const configDir = path.join(os.homedir(), '.codethon');
-  if (!fs.existsSync(configDir)) {
-    fs.mkdirSync(configDir, { recursive: true });
-  }
-
-  // Save onboarding state
-  const statePath = path.join(configDir, 'onboarding.json');
-  const state = {
-    completed: true,
-    step: 5,
-    modelConfigured: found.length > 0,
-    apiKeysSet: found,
-    projectCreated: false,
-    theme: 'dark',
+const PROVIDER_CHOICES: ProviderChoice[] = PROVIDER_ORDER.map(provider => {
+  const profile = getProviderProfile(provider)!;
+  return {
+    name: `${profile.name.padEnd(10, ' ')} — ${profile.bestFor}\n          ${profile.website}`,
+    value: provider,
+    short: profile.name,
   };
-  fs.writeFileSync(statePath, JSON.stringify(state, null, 2));
+});
+
+interface ModelChoice {
+  id: string;
+  name: string;
+  provider: string;
+  contextWindow: number;
+  pricing: string;
+  recommended?: boolean;
+}
+
+const PROVIDER_MODELS: Record<string, ModelChoice[]> = {
+  openai: [
+    { id: 'gpt-4o', name: 'GPT-4o', provider: 'openai', contextWindow: 128000, pricing: '$2.50/$10.00', recommended: true },
+    { id: 'gpt-4o-mini', name: 'GPT-4o Mini', provider: 'openai', contextWindow: 128000, pricing: '$0.15/$0.60' },
+    { id: 'o4-mini', name: 'o4 Mini', provider: 'openai', contextWindow: 200000, pricing: 'Reasoning' },
+    { id: 'gpt-4.1', name: 'GPT-4.1', provider: 'openai', contextWindow: 128000, pricing: 'Check pricing' },
+  ],
+  anthropic: [
+    { id: 'claude-sonnet-4-20250514', name: 'Claude Sonnet 4', provider: 'anthropic', contextWindow: 200000, pricing: '$3/$15', recommended: true },
+    { id: 'claude-haiku-3-5-20241022', name: 'Claude Haiku 3.5', provider: 'anthropic', contextWindow: 200000, pricing: '$0.80/$4.00' },
+  ],
+  groq: [
+    { id: 'llama-3.3-70b-versatile', name: 'Llama 3.3 70B', provider: 'groq', contextWindow: 131072, pricing: 'Free', recommended: true },
+    { id: 'llama-3.1-8b-instant', name: 'Llama 3.1 8B', provider: 'groq', contextWindow: 131072, pricing: 'Free' },
+    { id: 'mixtral-8x7b-32768', name: 'Mixtral 8x7B', provider: 'groq', contextWindow: 32768, pricing: 'Free' },
+  ],
+  nvidia: [
+    { id: 'deepseek-ai/deepseek-v4-flash', name: 'DeepSeek V4 Flash', provider: 'nvidia', contextWindow: 131072, pricing: 'Free', recommended: true },
+    { id: 'nvidia/llama-3.3-nemotron-super-49b-v1', name: 'Nemotron Super 49B', provider: 'nvidia', contextWindow: 128000, pricing: 'Free' },
+    { id: 'meta/llama-3.1-70b-instruct', name: 'Llama 3.1 70B', provider: 'nvidia', contextWindow: 128000, pricing: 'Free' },
+  ],
+  deepseek: [
+    { id: 'deepseek-chat', name: 'DeepSeek V3', provider: 'deepseek', contextWindow: 65536, pricing: '$0.27/$1.10', recommended: true },
+    { id: 'deepseek-reasoner', name: 'DeepSeek R1', provider: 'deepseek', contextWindow: 65536, pricing: '$0.55/$2.19' },
+  ],
+  together: [
+    { id: 'meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo', name: 'Llama 3.1 70B', provider: 'together', contextWindow: 131072, pricing: '$0.59/$0.59', recommended: true },
+    { id: 'mistralai/Mixtral-8x22B-Instruct-v0.1', name: 'Mixtral 8x22B', provider: 'together', contextWindow: 65536, pricing: '$1.20/$1.20' },
+  ],
+  ollama: [
+    { id: 'llama3.2', name: 'Llama 3.2 (default)', provider: 'ollama', contextWindow: 8192, pricing: 'Free', recommended: true },
+    { id: 'mistral', name: 'Mistral', provider: 'ollama', contextWindow: 8192, pricing: 'Free' },
+    { id: 'codellama', name: 'CodeLlama', provider: 'ollama', contextWindow: 16384, pricing: 'Free' },
+  ],
+  'local-server': [
+    { id: 'local-model', name: 'Local Model (default)', provider: 'local-server', contextWindow: 8192, pricing: 'Free', recommended: true },
+  ],
+};
+
+async function validateApiKey(provider: string, apiKey: string): Promise<string | null> {
+  const setup = PROVIDER_SETUP[provider];
+  if (!setup) return `Unknown provider: ${provider}`;
+
+  // Local providers don't need API keys
+  if (!setup.envVar) return null;
+
+  if (!apiKey || apiKey.trim().length < 8) {
+    return 'API key looks too short. Please check and try again.';
+  }
+
+  const baseURLs: Record<string, string> = {
+    openai: 'https://api.openai.com/v1/models',
+    anthropic: 'https://api.anthropic.com/v1/messages',
+    groq: 'https://api.groq.com/openai/v1/models',
+    nvidia: 'https://integrate.api.nvidia.com/v1/models',
+    deepseek: 'https://api.deepseek.com/v1/models',
+    together: 'https://api.together.ai/v1/models',
+  };
+
+  const url = baseURLs[provider];
+  if (!url) return null; // skip validation for unknown providers
+
+  try {
+    const headers: Record<string, string> = {
+      'Authorization': `Bearer ${apiKey}`,
+    };
+    if (provider === 'anthropic') {
+      headers['x-api-key'] = apiKey;
+      headers['anthropic-version'] = '2023-06-01';
+    }
+
+    const res = await fetch(url, { headers, signal: AbortSignal.timeout(10000) });
+    if (res.ok) {
+      return null; // valid
+    }
+    if (res.status === 401 || res.status === 403) {
+      return 'API key rejected (401/403). Please check your key and try again.';
+    }
+    if (res.status === 429) {
+      return 'Rate limited. Wait a moment and try again, or check your quota.';
+    }
+    return `API returned status ${res.status}. Please verify your key.`;
+  } catch (e: any) {
+    if (e.name === 'AbortError') {
+      return 'Connection timed out. Check your internet or the provider URL.';
+    }
+    return `Connection error: ${e.message}`;
+  }
+}
+
+export async function onboardCommand(reset?: boolean): Promise<CommandResult> {
+  // Reset mode
+  if (reset) {
+    const { resetConfig } = await import('../utils/config');
+    resetConfig();
+    logger.success('Configuration reset.');
+    if (process.stdin.isTTY && process.stdout.isTTY) {
+      logger.info(`  ${chalk.dim('Restarting guided setup...')}`);
+      console.log('');
+      return onboardCommand(false);
+    }
+    logger.info('Run ct onboard to start setup again.');
+    return { success: true, message: 'Configuration reset' };
+  }
+
+  printHero(
+    'Welcome to CodeThon CLI',
+    'This setup connects an AI provider, verifies access, picks a default model, and gets the CLI ready for real work.',
+    'setup',
+    'First-run setup',
+  );
+
+  // Step 1: Choose provider
+  const provider = await promptSelect({
+    message: 'Choose an AI provider:',
+    choices: PROVIDER_CHOICES,
+  });
+
+  const setup = PROVIDER_SETUP[provider];
+  const needsKey = setup && setup.envVar;
+  const profile = getProviderProfile(provider);
+
+  if (profile) {
+    console.log('');
+    logger.labelValue('Provider', profile.name);
+    logger.labelValue('Best For', profile.bestFor);
+    logger.labelValue('Pricing', profile.pricingHint);
+    logger.labelValue(profile.local ? 'Start Local Server' : 'Get API Key', profile.setupUrl);
+    console.log('');
+  }
+
+  let apiKey = '';
+
+  // Step 2: Collect API key (skip for local providers)
+  if (needsKey) {
+    const keyFromEnv = process.env[setup.envVar] || '';
+    if (keyFromEnv) {
+      const useEnv = await promptConfirm({
+        message: `Found ${setup.envVar} in environment. Use it?`,
+        defaultValue: true,
+      });
+      if (useEnv) {
+        apiKey = keyFromEnv;
+      }
+    }
+
+    // Validate key
+    let validationError: string | null = 'initial';
+    while (validationError !== null) {
+      if (!apiKey) {
+        apiKey = (await promptInput({
+          message: `Enter your ${provider} API key`,
+          password: true,
+          validate: (value: string) => value.trim().length > 0 ? true : 'Please enter an API key',
+        })).trim();
+      }
+
+      logger.info(`\n  ${chalk.dim('Validating API key...')}`);
+      validationError = await validateApiKey(provider, apiKey);
+
+      if (validationError) {
+        logger.error(`  ${validationError}`);
+        logger.info(chalk.dim(`  Get a key: ${setup.url}`));
+        console.log('');
+        apiKey = '';
+        const retry = await promptConfirm({
+          message: 'Try again?',
+          defaultValue: true,
+        });
+        if (!retry) {
+          logger.info('Onboarding cancelled. Run ct to restart setup.');
+          return { success: false, message: 'Onboarding cancelled' };
+        }
+      }
+    }
+    logger.success('  Authentication successful');
+  }
+
+  // Step 3: Choose model
+  const models = getModelsForProvider(provider).map(model => ({
+    id: model.id,
+    name: model.name,
+    provider: model.provider,
+    contextWindow: model.contextWindow,
+    maxOutput: model.maxOutput,
+    pricing: model.pricing,
+    recommended: model.recommended,
+  }));
+  console.log('');
+  const modelChoices = models.map(m => {
+    const ctx = formatContextWindow(m.contextWindow);
+    const price = m.pricing === 'Free' ? chalk.green('Free') : chalk.dim(m.pricing);
+    const badge = m.recommended ? chalk.bgGreen.black(' BEST ') : '';
+    const name = m.recommended ? chalk.bold(m.name) : m.name;
+    return {
+      name: `  ${name}  ${chalk.dim(`${ctx} ctx`)}  ${price} ${badge}`,
+      value: m.id,
+      short: m.name,
+    };
+  });
+
+  const model = await promptSelect({
+    message: 'Select a model:',
+    choices: modelChoices,
+  });
+  const selectedModel = models.find(entry => entry.id === model);
+
+  // Step 4: Save config
+  setLLMConfig({
+    provider: provider as any,
+    model,
+    temperature: 0.3,
+    maxTokens: selectedModel?.maxOutput || 4096,
+  });
+
+  // Store key in env for the session and keychain for persistence
+  if (needsKey && apiKey) {
+    process.env[setup.envVar] = apiKey;
+    try {
+      const { storeSecret } = await import('../utils/keychain');
+      await storeSecret(setup.envVar, apiKey);
+    } catch { /* non-critical */ }
+  }
+
+  // Step 5: Run test request
+  console.log('');
+  logger.info(`  ${chalk.dim('Running test request...')}`);
+  try {
+    const { createProvider } = await import('../llm/providers/index');
+    const llm = getLLMConfig();
+    const prov = createProvider({
+      provider: provider as any,
+      modelId: model,
+      apiKey: apiKey || undefined,
+      temperature: 0.1,
+      maxTokens: 100,
+    });
+    const res = await prov.generate({
+      messages: [{ role: 'user', content: 'Say "Hello from CodeThon CLI!" and nothing else.' }],
+      temperature: 0.1,
+      maxTokens: 100,
+    });
+    if (res.content) {
+      logger.success('  Model verified');
+      console.log(`    ${chalk.dim(res.content.slice(0, 100))}`);
+    }
+  } catch {
+    logger.warn('  Test request failed. Your config is saved, but check connectivity.');
+  }
+
+  // Step 6: Mark complete
+  const { saveOnboardingComplete } = await import('../features/onboarding');
+  saveOnboardingComplete({
+    provider,
+    model,
+    apiKeySet: needsKey ? true : false,
+  });
 
   console.log('');
-  logger.success('Setup complete!');
+  logger.success('Configuration saved');
+  printActionHints('Suggested next actions', [
+    { command: 'init', description: 'Set up a project workspace or describe the one you want to build.' },
+    { command: 'plan', description: 'Generate a roadmap and architecture before writing code.' },
+    { command: 'execute "<goal>"', description: 'Give the agent a concrete task to work on.' },
+    { command: 'doctor', description: 'Run diagnostics if you want a full health check before starting.' },
+  ], '/');
   console.log('');
-  logger.info(chalk.bold('Quick start:'));
-  logger.info(`  ${chalk.cyanBright('/plan --feature "my idea"')}  ${chalk.dim('Design your project')}`);
-  logger.info(`  ${chalk.cyanBright('/scaffold')}          ${chalk.dim('Generate starter files')}`);
-  logger.info(`  ${chalk.cyanBright('/execute "build it"')} ${chalk.dim('Let the AI build it')}`);
-  logger.info('');
-  logger.info(`Need help? ${chalk.dim('Type /help for all commands or /learn to ask anything')}`);
+  logger.info(`  ${chalk.dim('You can reopen the interactive REPL anytime with')} ${chalk.cyanBright('ct')}${chalk.dim('.')}`);
 
   return { success: true, message: 'Onboarding complete' };
-
-  async function checkLocalServer(url: string): Promise<boolean> {
-    try {
-      if (typeof fetch !== 'undefined') {
-        const res = await fetch(url, { signal: AbortSignal.timeout(2000) });
-        return res.ok;
-      }
-    } catch { /* not running */ }
-    return false;
-  }
 }

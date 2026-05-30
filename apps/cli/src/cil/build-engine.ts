@@ -6,7 +6,7 @@ import { createProvider } from '@codethon/llm-client';
 import type { LLMProvider, LLMMessage, LLMResponse } from '@codethon/llm-client';
 import { getLLMConfig } from '../utils/config';
 import { ProjectAnalyzer } from '../agents/project-analyzer';
-import type { ProjectAnalysis } from '../agents/project-analyzer';
+import type { ProjectAnalysis, ProjectAnalysisCallbacks } from '../agents/project-analyzer';
 import { sanitizeEnv, resolveBin } from '../utils/env';
 import { requireApproval } from '../utils/approval';
 
@@ -49,8 +49,8 @@ export class BuildEngine {
     this.dryRun = dryRun;
   }
 
-  async analyzeProject(): Promise<ProjectAnalysis> {
-    return this.analyzer.analyze(this.projectPath);
+  async analyzeProject(callbacks?: ProjectAnalysisCallbacks): Promise<ProjectAnalysis> {
+    return this.analyzer.analyze(this.projectPath, callbacks);
   }
 
   async build(goal: string, onToken?: (token: string) => void): Promise<{ filesWritten: number; commandsRun: number; errors: string[] }> {

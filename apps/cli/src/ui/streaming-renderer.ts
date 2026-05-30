@@ -99,7 +99,7 @@ export class StreamingRenderer {
     });
 
     const result = highlightedLines.join('\n');
-    return result + ' \x1b[6n';
+    return result;
   }
 
   append(text: string): string {
@@ -108,7 +108,7 @@ export class StreamingRenderer {
 
   appendWithCursor(text: string): string {
     const highlighted = this.streamToken(text);
-    return highlighted + '\x1b[5m\u258C\x1b[25m';
+    return highlighted + '\u258C';
   }
 
   getContent(): string {

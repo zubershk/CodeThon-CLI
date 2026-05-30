@@ -1,8 +1,9 @@
 import type { CommandResult } from '@codethon/shared-types';
 import { LaunchAgent } from '../agents/launch-agent';
 import { StateManager } from '../cil/state-manager';
-import { createSpinner, logger } from '../utils';
+import { logger } from '../utils';
 import { writeFile } from '../utils/file-utils';
+import { createMarkdownStreamRenderer } from '../utils/render';
 import path from 'path';
 
 export async function readmeCommand(): Promise<CommandResult> {
@@ -16,27 +17,27 @@ export async function readmeCommand(): Promise<CommandResult> {
   }
 
   const agent = new LaunchAgent();
-  const spinner = createSpinner('Generating README...');
-  spinner.start();
+  const stream = createMarkdownStreamRenderer({ title: 'README Draft' });
 
   try {
-    const output = await agent.run('readme', `Project: ${project.idea}\nStack: ${project.stack}`);
-
-    spinner.succeed('README generated!');
-    logger.info('');
-    logger.outputBlock(output.details);
+    const details = await agent.runStream(
+      'readme',
+      token => stream.write(token),
+      `Project: ${project.idea}\nStack: ${project.stack}`,
+    );
+    stream.end();
 
     const readmePath = path.join(process.cwd(), 'README.md');
-    writeFile(readmePath, output.details);
+    writeFile(readmePath, details);
     logger.info('');
     logger.labelValue('Saved to', readmePath);
 
     project.outputs.push('README generated');
     state.updateProject({ outputs: project.outputs });
 
-    return { success: true, message: 'README generated', data: { readme: output.details } };
+    return { success: true, message: 'README generated', data: { readme: details } };
   } catch (error) {
-    spinner.fail('Failed to generate README');
+    stream.end();
     logger.error(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     return { success: false, message: 'Failed to generate README' };
   }

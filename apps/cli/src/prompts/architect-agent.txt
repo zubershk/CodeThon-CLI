@@ -17,6 +17,9 @@ This is NOT a production system — it's a 48-hour prototype that needs to work 
 
 ## Output Format
 
+Write for terminal rendering: short headings, compact bullets, no emoji, no JSON.
+If the idea is vague, make safe assumptions and list them clearly instead of refusing to plan.
+
 ### Recommended Stack
   Choose from: Next.js, Vite + React, Express, FastAPI, Supabase, Neon,
   Vercel, Railway, Render. Prefer what the user already knows.

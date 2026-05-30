@@ -5,7 +5,33 @@ import type { CommandResult } from '@codethon/shared-types';
 import { BuildEngine } from '../cil/build-engine';
 import { StateManager } from '../cil/state-manager';
 import { logger } from '../utils';
-import { renderAgentOutput } from '../utils/render';
+import { createMarkdownStreamRenderer, type MarkdownStreamRenderer } from '../utils/render';
+
+function countNodes(nodes: Array<{ children?: any[] }>): number {
+  let count = 0;
+  for (const node of nodes) {
+    count++;
+    if (node.children) count += countNodes(node.children);
+  }
+  return count;
+}
+
+function printRunFacts(rows: Array<{ label: string; value: string }>): void {
+  const width = Math.max(60, Math.min(110, (process.stdout.columns || 88) - 4));
+  const inner = width - 4;
+  console.log(`  ${chalk.cyan('┌')}${chalk.cyan('─'.repeat(width - 2))}${chalk.cyan('┐')}`);
+  console.log(`  ${chalk.cyan('│')} ${chalk.bold.whiteBright('Analysis run'.padEnd(inner))} ${chalk.cyan('│')}`);
+  console.log(`  ${chalk.cyan('├')}${chalk.cyan('─'.repeat(width - 2))}${chalk.cyan('┤')}`);
+  for (const row of rows) {
+    const label = `${row.label}:`.padEnd(12);
+    const value = row.value.replace(/\s+/g, ' ');
+    const text = `${label} ${value}`;
+    const clipped = text.length > inner ? `${text.slice(0, inner - 1)}…` : text.padEnd(inner);
+    console.log(`  ${chalk.cyan('│')} ${chalk.dim(clipped)} ${chalk.cyan('│')}`);
+  }
+  console.log(`  ${chalk.cyan('└')}${chalk.cyan('─'.repeat(width - 2))}${chalk.cyan('┘')}`);
+  console.log('');
+}
 
 export async function analyzeCommand(targetDir?: string): Promise<CommandResult> {
   const state = new StateManager();
@@ -50,17 +76,35 @@ export async function analyzeCommand(targetDir?: string): Promise<CommandResult>
   }
 
   logger.section(`CodeThon CLI — Analysis: ${chalk.bold(path.basename(scanDir))}`);
+  printRunFacts([
+    { label: 'Target', value: scanDir },
+    { label: 'Checks', value: 'file tree, key configs, stack, entry points, missing files, static issues, AI summary' },
+    { label: 'Output', value: 'summary streams live; details appear after the scan' },
+  ]);
   const engine = new BuildEngine(scanDir);
 
   try {
-    logger.info(`${chalk.cyanBright('\u25B8')} Scanning project structure...\n`);
-
-    const analysis = await engine.analyzeProject();
+    const summaryStreams: MarkdownStreamRenderer[] = [];
+    let summaryStreamed = false;
+    const analysis = await engine.analyzeProject({
+      onProgress: message => logger.info(message),
+      onSummaryStart: () => {
+        summaryStreams[0] = createMarkdownStreamRenderer({ title: 'AI Summary' });
+      },
+      onSummaryToken: token => {
+        summaryStreamed = true;
+        summaryStreams[0]?.write(token);
+      },
+    });
+    summaryStreams[0]?.end();
+    if (summaryStreamed) process.stdout.write('\n');
 
     logger.labelValue('Name', analysis.name);
     logger.labelValue('Tech Stack', analysis.techStack.join(', ') || chalk.gray('unknown'));
     logger.labelValue('Entry Points', analysis.entryPoints.join(', ') || chalk.gray('none'));
-    logger.labelValue('Key Files Found', `${analysis.structure.length}`);
+    logger.labelValue('Files/Folders Scanned', `${countNodes(analysis.structure)}`);
+    logger.labelValue('Issues', `${analysis.issues.length}`);
+    logger.labelValue('Missing Files', `${analysis.missingFiles.length}`);
     logger.divider();
     process.stdout.write('\n');
 
@@ -113,10 +157,12 @@ export async function analyzeCommand(targetDir?: string): Promise<CommandResult>
       process.stdout.write('\n');
     }
 
-    logger.subsection('Summary');
-    process.stdout.write('\n');
-    renderAgentOutput(analysis.summary);
-    process.stdout.write('\n');
+    if (!summaryStreamed) {
+      const fallback = createMarkdownStreamRenderer({ title: 'AI Summary' });
+      fallback.write(analysis.summary);
+      fallback.end();
+      process.stdout.write('\n');
+    }
 
     if (project) {
       state.updateProject({ outputs: [...(project.outputs || []), 'Analysis completed'] });

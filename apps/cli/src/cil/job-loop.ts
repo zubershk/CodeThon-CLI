@@ -1,6 +1,6 @@
 import { createProvider, LLMRouter, CostTracker } from '../llm/index';
 import type { LLMProvider, LLMMessage } from '../llm/index';
-import { getLLMConfig } from '../utils/config';
+import { getLLMConfig, validateProviderConfig } from '../utils/config';
 import { ToolExecutor } from './tools';
 import type { ToolCall, ToolResult } from './tools';
 import { searchWeb, crawlUrl } from '../utils/web-search';
@@ -74,6 +74,7 @@ export class JobLoop {
   private costTracker: CostTracker | null = null;
   private useFallback: boolean;
   private providerInitError: string | null = null;
+  private cancelReason: string | null = null;
 
   constructor(projectRoot: string, maxIterations = 20, askMode = false, dryRun = false, useFallback = false) {
     this.useFallback = useFallback;
@@ -99,11 +100,29 @@ export class JobLoop {
     }
   }
 
+  cancel(reason = 'Execution interrupted by user.'): void {
+    this.cancelReason = reason;
+  }
+
+  private buildCancelledResult(iterations: number, errors: string[]): JobResult {
+    const summary = this.cancelReason || 'Execution interrupted by user.';
+    if (!errors.includes(summary)) errors.push(summary);
+    return {
+      success: false,
+      iterations,
+      summary,
+      errors,
+      elapsed: Math.floor((Date.now() - this.startTime) / 1000),
+    };
+  }
+
   private ensureProvider(): LLMProvider {
     if (this.provider) return this.provider;
     if (this.providerInitError) {
       throw new Error(`LLM provider init failed: ${this.providerInitError}. Run /onboard to configure API keys.`);
     }
+    const check = validateProviderConfig();
+    if (!check.ok) throw new Error(`\u26A0  ${check.message}`);
     const config = getLLMConfig();
     this.provider = createProvider({
       provider: config.provider as any,
@@ -235,6 +254,7 @@ export class JobLoop {
     const errors: string[] = [];
     this.startTime = Date.now();
     this.goal = goal;
+    this.cancelReason = null;
 
     // Fail early if provider can't be initialized
     try {
@@ -265,6 +285,19 @@ export class JobLoop {
     }
 
     for (let iteration = 0; iteration < this.maxIterations; iteration++) {
+      if (this.cancelReason) {
+        const summary = this.cancelReason;
+        onStatus?.({
+          iteration,
+          phase: 'done',
+          description: summary,
+          done: true,
+          error: summary,
+          totalElapsed: Math.floor((Date.now() - this.startTime) / 1000),
+        });
+        return this.buildCancelledResult(iteration, errors);
+      }
+
       const iterStart = Date.now();
       onStatus?.({
         iteration,
@@ -278,10 +311,35 @@ export class JobLoop {
       try {
         content = await this.withRetry(() => this.generateWithStream(onToken), 'LLM generate');
       } catch (e: any) {
+        if (this.cancelReason) {
+          const summary = this.cancelReason;
+          onStatus?.({
+            iteration,
+            phase: 'done',
+            description: summary,
+            done: true,
+            error: summary,
+            totalElapsed: Math.floor((Date.now() - this.startTime) / 1000),
+          });
+          return this.buildCancelledResult(iteration, errors);
+        }
         const friendly = formatApiError(e);
         errors.push(friendly);
         onStatus?.({ iteration, phase: 'done', description: `LLM error: ${e.message}`, done: true, error: e.message });
         return { success: false, iterations: iteration + 1, summary: friendly, errors, elapsed: Math.floor((Date.now() - this.startTime) / 1000) };
+      }
+
+      if (this.cancelReason) {
+        const summary = this.cancelReason;
+        onStatus?.({
+          iteration,
+          phase: 'done',
+          description: summary,
+          done: true,
+          error: summary,
+          totalElapsed: Math.floor((Date.now() - this.startTime) / 1000),
+        });
+        return this.buildCancelledResult(iteration + 1, errors);
       }
 
       const genElapsed = Math.floor((Date.now() - iterStart) / 1000);
@@ -317,6 +375,19 @@ export class JobLoop {
 
         const results: ToolResult[] = [];
         for (const call of toolCalls) {
+          if (this.cancelReason) {
+            const summary = this.cancelReason;
+            onStatus?.({
+              iteration,
+              phase: 'done',
+              description: summary,
+              done: true,
+              error: summary,
+              totalElapsed: Math.floor((Date.now() - this.startTime) / 1000),
+            });
+            return this.buildCancelledResult(iteration + 1, errors);
+          }
+
           const toolStart = Date.now();
           let result: ToolResult;
           if (call.tool === 'web_search') {
@@ -339,6 +410,19 @@ export class JobLoop {
             totalElapsed: Math.floor((Date.now() - this.startTime) / 1000),
             iterElapsed: Math.floor((Date.now() - iterStart) / 1000),
           });
+
+          if (this.cancelReason) {
+            const summary = this.cancelReason;
+            onStatus?.({
+              iteration,
+              phase: 'done',
+              description: summary,
+              done: true,
+              error: summary,
+              totalElapsed: Math.floor((Date.now() - this.startTime) / 1000),
+            });
+            return this.buildCancelledResult(iteration + 1, errors);
+          }
         }
 
         this.conversation.push({ role: 'assistant', content });
@@ -403,6 +487,9 @@ export class JobLoop {
 
       if (onToken) {
         for (const char of result.response) {
+          if (this.cancelReason) {
+            throw new Error(this.cancelReason);
+          }
           onToken(char);
         }
       }
@@ -417,8 +504,14 @@ export class JobLoop {
         maxTokens: 4000,
       });
       for await (const token of stream) {
+        if (this.cancelReason) {
+          throw new Error(this.cancelReason);
+        }
         content += token;
         onToken(token);
+      }
+      if (this.cancelReason) {
+        throw new Error(this.cancelReason);
       }
       return content;
     }

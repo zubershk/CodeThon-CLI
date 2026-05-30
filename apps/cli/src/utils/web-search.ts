@@ -1,5 +1,6 @@
 import https from 'https';
 import http from 'http';
+import { validateUrl } from '../security/policy';
 
 export interface SearchResult {
   title: string;
@@ -18,8 +19,12 @@ export interface CrawledPage {
 }
 
 const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+const MAX_RESPONSE_SIZE = 5 * 1024 * 1024; // 5MB cap
 
 function fetchUrl(url: string): Promise<{ body: string; contentType: string }> {
+  const check = validateUrl(url);
+  if (!check.valid) return Promise.reject(new Error(check.reason));
+
   return new Promise((resolve, reject) => {
     const mod = url.startsWith('https') ? https : http;
     const req = mod.get(url, {
@@ -32,7 +37,16 @@ function fetchUrl(url: string): Promise<{ body: string; contentType: string }> {
     }, (res) => {
       const ct = res.headers['content-type'] || '';
       const chunks: Buffer[] = [];
-      res.on('data', (c: Buffer) => chunks.push(c));
+      let totalSize = 0;
+      res.on('data', (c: Buffer) => {
+        totalSize += c.length;
+        if (totalSize > MAX_RESPONSE_SIZE) {
+          req.destroy();
+          reject(new Error('Response too large (>5MB)'));
+          return;
+        }
+        chunks.push(c);
+      });
       res.on('end', () => {
         const body = Buffer.concat(chunks).toString('utf-8');
         resolve({ body, contentType: Array.isArray(ct) ? ct[0] : ct });

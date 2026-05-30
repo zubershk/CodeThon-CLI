@@ -1,9 +1,9 @@
-import chalk from 'chalk';
 import type { CommandResult } from '@codethon/shared-types';
 import { PMAgent } from '../agents/pm-agent';
 import { StateManager } from '../cil/state-manager';
 import { HealthScoreCalculator } from '../cil/health-score';
-import { createSpinner, logger } from '../utils';
+import { logger } from '../utils';
+import { createMarkdownStreamRenderer } from '../utils/render';
 
 export async function roadmapCommand(): Promise<CommandResult> {
   logger.section('CodeThon CLI — Roadmap Generation');
@@ -16,25 +16,19 @@ export async function roadmapCommand(): Promise<CommandResult> {
   }
 
   const agent = new PMAgent();
-  const spinner = createSpinner(chalk.bold.yellow('Thinking...'));
-  spinner.start();
+  const stream = createMarkdownStreamRenderer({ title: 'Roadmap' });
 
   try {
-    let started = false;
     let fullOutput = '';
 
     await agent.runStream(
       project.idea,
       (token) => {
-        if (!started) {
-          started = true;
-          spinner.stop();
-          process.stdout.write('\n');
-        }
         fullOutput += token;
-        process.stdout.write(chalk.whiteBright(token));
+        stream.write(token);
       }
     );
+    stream.end();
 
     process.stdout.write('\n\n');
 
@@ -44,7 +38,7 @@ export async function roadmapCommand(): Promise<CommandResult> {
 
     return { success: true, message: 'Roadmap generated', data: { roadmap: fullOutput } };
   } catch (error) {
-    spinner.fail('Failed to generate roadmap');
+    stream.end();
     logger.error(error instanceof Error ? error.message : String(error));
     return { success: false, message: 'Failed to generate roadmap' };
   }

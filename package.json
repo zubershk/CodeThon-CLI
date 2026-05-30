@@ -9,6 +9,9 @@
     "dev": "cd apps/cli && npm run dev",
     "test": "cd apps/cli && npm test",
     "test:watch": "cd apps/cli && npm run test:watch",
+    "typecheck": "cd apps/cli && npm run typecheck",
+    "smoke": "npm run build && node apps/cli/dist/index.js help",
+    "pack:cli": "cd apps/cli && npm pack",
     "clean": "if (Test-Path apps/cli/dist) { Remove-Item -Recurse -Force apps/cli/dist }",
     "postinstall": "cd apps/cli && npm install"
   },

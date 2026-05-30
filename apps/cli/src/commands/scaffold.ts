@@ -1,6 +1,5 @@
 import fs from 'fs';
 import path from 'path';
-import inquirer from 'inquirer';
 import type { CommandResult } from '@codethon/shared-types';
 import { StateManager } from '../cil/state-manager';
 import { executeCommand } from '../runtime';
@@ -8,6 +7,7 @@ import { createSpinner, logger } from '../utils';
 import { ensureDir, writeFile } from '../utils/file-utils';
 import { TEMPLATES } from '../templates/templates';
 import type { Template } from '../templates/templates';
+import { promptSelect } from '../utils/prompt';
 
 export async function scaffoldCommand(targetDir?: string, templateNameArg?: string): Promise<CommandResult> {
   logger.section('CodeThon CLI — Project Scaffold');
@@ -21,15 +21,10 @@ export async function scaffoldCommand(targetDir?: string, templateNameArg?: stri
 
   let templateName = templateNameArg;
   if (!templateName) {
-    const resp = await inquirer.prompt([
-      {
-        type: 'list',
-        name: 'templateName',
-        message: 'Choose a project template:',
-        choices: TEMPLATES.map(t => ({ name: `  ${t.name} — ${t.description}`, value: t.name })),
-      },
-    ]);
-    templateName = resp.templateName;
+    templateName = await promptSelect({
+      message: 'Choose a project template:',
+      choices: TEMPLATES.map(t => ({ name: `  ${t.name} — ${t.description}`, value: t.name })),
+    });
   }
 
   const template = TEMPLATES.find(t => t.name === templateName)!;

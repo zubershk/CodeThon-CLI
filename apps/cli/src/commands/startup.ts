@@ -1,7 +1,8 @@
 import type { CommandResult } from '@codethon/shared-types';
 import { StartupAgent } from '../agents/startup-agent';
 import { StateManager } from '../cil/state-manager';
-import { createSpinner, logger } from '../utils';
+import { logger } from '../utils';
+import { createMarkdownStreamRenderer } from '../utils/render';
 
 export async function startupCommand(): Promise<CommandResult> {
   logger.section('CodeThon CLI — Startup Analysis');
@@ -14,25 +15,23 @@ export async function startupCommand(): Promise<CommandResult> {
   }
 
   const agent = new StartupAgent();
-  const spinner = createSpinner('Analyzing startup potential...');
-  spinner.start();
+  const stream = createMarkdownStreamRenderer({ title: 'Startup Analysis' });
 
   try {
-    const output = await agent.run(
+    const analysis = await agent.runStream(
       `Project: ${project.idea}\nStack: ${project.stack}\nTimeline: ${project.timeline}`,
+      token => stream.write(token),
     );
+    stream.end();
 
-    spinner.succeed('Startup analysis complete!');
-    logger.info('');
-    logger.outputBlock(output.details);
     logger.info('');
 
     project.outputs.push('Startup analysis generated');
     state.updateProject({ outputs: project.outputs });
 
-    return { success: true, message: 'Startup analysis complete', data: { analysis: output.details } };
+    return { success: true, message: 'Startup analysis complete', data: { analysis } };
   } catch (error) {
-    spinner.fail('Failed to analyze startup potential');
+    stream.end();
     logger.error(error instanceof Error ? error.message : String(error));
     return { success: false, message: 'Failed to analyze startup potential' };
   }

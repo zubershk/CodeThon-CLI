@@ -13,7 +13,6 @@ export { startupCommand } from './startup';
 export { learnCommand } from './learn';
 export { statusCommand } from './status';
 export { reviewCommand } from './review';
-export { diffCommand } from './diff';
 export { clearCommand } from './clear';
 export { analyzeCommand } from './analyze';
 export { buildCommand } from './build';
@@ -31,3 +30,11 @@ export { testGenCommand } from './test-gen';
 export { profileCommand } from './profile';
 export { checkpointCommand } from './checkpoint';
 export { onboardCommand } from './onboard';
+export {
+  authAddCommand,
+  authListCommand,
+  authTestCommand,
+  authSwitchCommand,
+  authRemoveCommand,
+  authLogoutCommand,
+} from './auth';

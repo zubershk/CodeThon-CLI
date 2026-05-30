@@ -2,63 +2,46 @@ import readline from 'readline';
 import chalk from 'chalk';
 import { cursorTo, moveCursor, clearScreenDown } from 'readline';
 import { StateManager } from '../cil/state-manager';
-import { getLLMConfig } from '../utils/config';
+import { getLLMConfig, getThemeMode, setThemeMode } from '../utils/config';
 import { logger } from '../utils';
 import { naturalLanguageCommand } from './nl';
 import { theme } from '../ui/theme';
 import { KeyBindingManager } from '../ui/keybindings';
+import { buildPromptLayout, stripAnsi, truncateText } from '../ui/terminal-text';
+import { buildSuggestedActions } from '../utils/experience';
+import { getProviderDisplayName } from '../utils/provider-catalog';
+import {
+  AI_COMMAND_NAMES,
+  findCommandSuggestions,
+  formatSlashUsage,
+  getCommandByName,
+  UNIQUE_COMMANDS,
+  type CommandEntry,
+} from '../utils/command-registry';
 import {
   initCommand, modelCommand, planCommand, roadmapCommand, architectCommand, scaffoldCommand,
   debugCommand, emergencyCommand, deployCommand, readmeCommand, launchCommand,
-  startupCommand, learnCommand, statusCommand, reviewCommand, diffCommand,
+  startupCommand, learnCommand, statusCommand, reviewCommand,
   clearCommand, analyzeCommand, buildCommand, autofixCommand, runCommand,
   executeCommand, doctorCommand, explainCommand, summarizeCommand, recoverCommand,
   gitCommand, testGenCommand, profileCommand, checkpointCommand, onboardCommand,
+  authAddCommand, authListCommand, authTestCommand, authSwitchCommand, authRemoveCommand, authLogoutCommand,
 } from './index';
 import { showCategorizedReplHelp } from '../utils/help';
+import { PromptCancelledError, promptConfirm, promptLine, resetSimplePromptSession } from '../utils/prompt';
 
-const SLASH_COMMANDS = [
-  { cmd: '/init', desc: 'Initialize a new project' },
-  { cmd: '/model', desc: 'Switch AI model' },
-  { cmd: '/roadmap', desc: 'Generate project roadmap' },
-  { cmd: '/plan', desc: 'Generate architecture plan' },
-  { cmd: '/architect', desc: 'Design architecture' },
-  { cmd: '/scaffold', desc: 'Scaffold project files' },
-  { cmd: '/build', desc: 'Build and auto-fix the project' },
-  { cmd: '/debug', desc: 'Debug build errors' },
-  { cmd: '/analyze', desc: 'Deep codebase analysis' },
-  { cmd: '/explain <file>', desc: 'Explain a file' },
-  { cmd: '/review', desc: 'Review current changes' },
-  { cmd: '/diff', desc: 'Show full diff' },
-  { cmd: '/run', desc: 'Run scripts without agent' },
-  { cmd: '/execute <goal>', desc: 'Autonomous execution agent' },
-  { cmd: '/deploy', desc: 'Deploy the project' },
-  { cmd: '/launch', desc: 'Generate launch assets' },
-  { cmd: '/startup', desc: 'Startup analysis' },
-  { cmd: '/learn', desc: 'Learn a new concept' },
-  { cmd: '/readme', desc: 'Generate README' },
-  { cmd: '/emergency', desc: 'Emergency recovery mode' },
-  { cmd: '/doctor', desc: 'Run project diagnostics' },
-  { cmd: '/summarize', desc: 'Generate project summary' },
-  { cmd: '/recover', desc: 'Scan and recover project state' },
-  { cmd: '/autofix', desc: 'Auto-fix build errors' },
-  { cmd: '/status', desc: 'Show project status & health' },
-  { cmd: '/clear', desc: 'Clear terminal' },
-  { cmd: '/git', desc: 'Git integration (status, diff, commit, review, PR)' },
-  { cmd: '/test', desc: 'Test agent (generate, coverage, mutate)' },
-  { cmd: '/profile', desc: 'Profile code for perf issues & smells' },
-  { cmd: '/checkpoint', desc: 'Recovery points (save, list, restore)' },
-  { cmd: '/onboard', desc: 'First-time setup wizard' },
-  { cmd: '/help', desc: 'Show available commands' },
-  { cmd: '/exit', desc: 'Exit REPL' },
-  { cmd: '/quit', desc: 'Exit REPL' },
-];
+const SLASH_COMMANDS = UNIQUE_COMMANDS.map(entry => ({
+  cmd: `/${entry.name}`,
+  usage: formatSlashUsage(entry),
+  desc: entry.description,
+}));
 
 const CMD_HANDLERS: Record<string, (...a: any[]) => any> = {
   '/init': initCommand, '/model': modelCommand, '/roadmap': roadmapCommand,
   '/plan': planCommand, '/architect': architectCommand, '/scaffold': scaffoldCommand,
   '/build': buildCommand, '/debug': debugCommand, '/analyze': analyzeCommand,
-  '/review': reviewCommand, '/diff': diffCommand, '/run': runCommand,
+  '/review': reviewCommand, '/run': runCommand,
+  '/diff': () => gitCommand('diff'),
   '/deploy': deployCommand, '/launch': launchCommand, '/startup': startupCommand,
   '/learn': learnCommand, '/readme': readmeCommand, '/emergency': emergencyCommand,
   '/doctor': doctorCommand, '/summarize': summarizeCommand, '/recover': recoverCommand,
@@ -73,7 +56,7 @@ const CT_HANDLERS: Record<string, { fn: (...a: any[]) => any; needsArg: boolean 
   architect: { fn: architectCommand, needsArg: false }, scaffold: { fn: scaffoldCommand, needsArg: false },
   build: { fn: buildCommand, needsArg: false }, debug: { fn: debugCommand, needsArg: false },
   analyze: { fn: analyzeCommand, needsArg: false }, review: { fn: reviewCommand, needsArg: false },
-  diff: { fn: diffCommand, needsArg: false }, run: { fn: runCommand, needsArg: false },
+  diff: { fn: () => gitCommand('diff'), needsArg: false }, run: { fn: runCommand, needsArg: false },
   deploy: { fn: deployCommand, needsArg: false }, launch: { fn: launchCommand, needsArg: false },
   startup: { fn: startupCommand, needsArg: false }, learn: { fn: learnCommand, needsArg: false },
   readme: { fn: readmeCommand, needsArg: false }, emergency: { fn: emergencyCommand, needsArg: false },
@@ -84,37 +67,58 @@ const CT_HANDLERS: Record<string, { fn: (...a: any[]) => any; needsArg: boolean 
   git: { fn: gitCommand, needsArg: false }, test: { fn: testGenCommand, needsArg: false },
   profile: { fn: profileCommand, needsArg: false }, checkpoint: { fn: checkpointCommand, needsArg: false },
   onboard: { fn: onboardCommand, needsArg: false },
+  auth: { fn: authListCommand, needsArg: false },
 };
 
-const INQUIRER_CMDS = new Set(['/init', '/model', '/debug', '/deploy', '/emergency', '/learn']);
-const INQUIRER_CT = new Set(['init', 'model', 'debug', 'deploy', 'emergency', 'learn']);
-
 const ALL_CMDS = SLASH_COMMANDS.map(c => c.cmd);
+const AI_REPL_COMMANDS = new Set(Array.from(AI_COMMAND_NAMES).map(name => `/${name}`));
 
 const BOX_W = 56;
-const CONTENT_W = BOX_W - 4;
-const CMD_W = 18;
-const DESC_W = CONTENT_W - CMD_W - 1;
 const MAX_VISIBLE = 10;
+const DEFAULT_PALETTE_ORDER = [
+  'execute',
+  'explain',
+  'checkpoint',
+  'architect',
+  'emergency',
+  'summarize',
+  'scaffold',
+  'roadmap',
+  'analyze',
+  'autofix',
+];
+const PALETTE_DESCRIPTIONS: Record<string, string> = {
+  execute: 'Autonomous execution agent',
+  explain: 'Explain a file',
+  checkpoint: 'Recovery points (save, list, restore)',
+  architect: 'Design architecture',
+  emergency: 'Emergency recovery mode',
+  summarize: 'Generate project summary',
+  scaffold: 'Scaffold project files',
+  roadmap: 'Generate project roadmap',
+  analyze: 'Deep codebase analysis',
+  autofix: 'Auto-fix build errors',
+};
 
 let inputBuffer = '';
 let cursorPos = 0;
-let prevCursorLine = 0;
+let prevCursorRow = 0;
 let history: string[] = [];
 let historyIdx = 0;
 let askMode = false;
 let dryRunMode = false;
 const customKeys = new KeyBindingManager();
-let suggestions: { cmd: string; desc: string }[] = [];
+let suggestions: { cmd: string; desc: string; insert?: string }[] = [];
 let selectedSuggestion = -1;
 let scrollOffset = 0;
+let commandInFlight = false;
+let suppressNextEmptySubmit = false;
+let suppressNextContextLine = false;
+let resizeHandlerBound = false;
+let keypressEventsBound = false;
 
 const promptStr = chalk.cyanBright(`${chalk.bold.magentaBright('CodeThon')} ${chalk.dim('>')} `);
 const promptWidth = stripAnsi(promptStr).length;
-
-function stripAnsi(s: string): string {
-  return s.replace(/\x1b\[[0-9;]*m/g, '');
-}
 
 function fuzzyScore(input: string, target: string): number {
   const a = input.toLowerCase();
@@ -129,23 +133,79 @@ function fuzzyScore(input: string, target: string): number {
   return score > 0 ? score : 0;
 }
 
+function showCommandSuggestions(query: string, slash = true): void {
+  suppressNextContextLine = true;
+  const isDefaultPalette = slash && (!query.trim() || query.trim() === '/');
+  const allMatches = isDefaultPalette
+    ? DEFAULT_PALETTE_ORDER
+        .map(name => getCommandByName(name))
+        .filter((entry): entry is CommandEntry => Boolean(entry))
+    : findCommandSuggestions(query);
+  const matches = allMatches.slice(0, MAX_VISIBLE);
+  if (matches.length === 0) {
+    logger.warn(`No commands match ${query}. Try /help.`);
+    return;
+  }
+
+  const commandText = (entry: CommandEntry) => slash ? formatSlashUsage(entry) : entry.usage;
+  const terminalWidth = process.stdout.columns || 80;
+  const boxWidth = Math.max(52, terminalWidth - 4);
+  const innerWidth = boxWidth - 4;
+  const commandWidth = Math.max(20, Math.min(32, Math.floor(innerWidth * 0.34)));
+  const descWidth = Math.max(10, innerWidth - commandWidth - 3);
+
+  console.log('');
+  console.log(`  ${chalk.dim('┌')}${chalk.dim('─'.repeat(boxWidth - 2))}${chalk.dim('┐')}`);
+
+  for (let index = 0; index < matches.length; index++) {
+    const entry = matches[index];
+    const selected = index === 0;
+    const marker = selected ? chalk.cyanBright('▶') : ' ';
+    const rawCommand = truncateText(commandText(entry), commandWidth);
+    const command = rawCommand.padEnd(commandWidth);
+    const rawDesc = truncateText(PALETTE_DESCRIPTIONS[entry.name] || entry.description, descWidth);
+    const desc = rawDesc.padEnd(descWidth);
+    const commandStyled = selected ? chalk.whiteBright(command) : chalk.cyanBright(command);
+    const descStyled = selected ? chalk.whiteBright(desc) : chalk.dim(desc);
+    console.log(`  ${chalk.dim('│')} ${marker} ${commandStyled} ${descStyled} ${chalk.dim('│')}`);
+  }
+
+  console.log(`  ${chalk.dim('└')}${chalk.dim('─'.repeat(boxWidth - 2))}${chalk.dim('┘')}`);
+  if (matches.length === MAX_VISIBLE) {
+    console.log(`  ${chalk.dim('Type more letters to narrow results, or /help for categories.')}`);
+  }
+  console.log('');
+}
+
 function computeSuggestions(): void {
   const words = inputBuffer.split(/\s+/);
   const lastWord = words[words.length - 1] || '';
 
   if (inputBuffer.startsWith('/')) {
-    const scored = ALL_CMDS
-      .map(cmd => {
-        const entry = SLASH_COMMANDS.find(s => s.cmd === cmd)!;
-        if (words.length === 1) return { cmd, desc: entry.desc, score: fuzzyScore(lastWord, cmd) };
-        if (words.length > 1 && cmd.startsWith(lastWord)) return { cmd, desc: entry.desc, score: 1 };
-        return { cmd, desc: entry.desc, score: 0 };
-      })
-      .filter(s => s.score > 0)
-      .sort((a, b) => b.score - a.score);
-    suggestions = scored;
+    if (words.length === 1 && lastWord === '/') {
+      suggestions = DEFAULT_PALETTE_ORDER
+        .map(name => getCommandByName(name))
+        .filter((entry): entry is CommandEntry => Boolean(entry))
+        .map(entry => ({
+          cmd: formatSlashUsage(entry),
+          insert: `/${entry.name}`,
+          desc: PALETTE_DESCRIPTIONS[entry.name] || entry.description,
+          score: 1000,
+        }));
+    } else {
+      const scored = ALL_CMDS
+        .map(cmd => {
+          const entry = SLASH_COMMANDS.find(s => s.cmd === cmd)!;
+          if (words.length === 1) return { cmd, desc: entry.desc, score: fuzzyScore(lastWord, cmd) };
+          if (words.length > 1 && cmd.startsWith(lastWord)) return { cmd, desc: entry.desc, score: 1 };
+          return { cmd, desc: entry.desc, score: 0 };
+        })
+        .filter(s => s.score > 0)
+        .sort((a, b) => b.score - a.score);
+      suggestions = scored;
+    }
+    if (suggestions.length > 0 && selectedSuggestion < 0) selectedSuggestion = 0;
     if (selectedSuggestion >= suggestions.length) selectedSuggestion = suggestions.length - 1;
-    if (selectedSuggestion < 0 && suggestions.length > 0) selectedSuggestion = 0;
   } else {
     suggestions = [];
     selectedSuggestion = -1;
@@ -162,53 +222,152 @@ function contextBanner(): void {
   const state = new StateManager();
   const project = state.getProject();
   const llm = getLLMConfig();
-  const width = 56;
+  const providerReady = Boolean(llm.apiKey) || llm.provider === 'ollama' || llm.provider === 'local-server';
+  const width = Math.min(110, Math.max(60, (process.stdout.columns || 80) - 6));
   const line = chalk.dim('\u2500'.repeat(width));
+  const actions = buildSuggestedActions(llm, project).slice(0, 2).map(action => `/${action.command.split(' ')[0]}`).join('  ');
+  const modeHints = [
+    askMode ? chalk.yellowBright('ask on') : chalk.dim('ask off'),
+    dryRunMode ? chalk.yellowBright('dry-run on') : chalk.dim('dry-run off'),
+  ].join('  ');
 
   console.log(`  ${chalk.dim(line)}`);
-  if (project) {
-    console.log(`  ${chalk.dim('Project:')} ${chalk.whiteBright(project.name)}`);
-    console.log(`  ${chalk.dim('Stack:')}   ${chalk.whiteBright(project.stack)}`);
-    let healthStr = '';
-    if (project.healthScore) {
-      const h = project.healthScore.overall;
-      const c = h >= 80 ? chalk.greenBright : h >= 50 ? chalk.yellowBright : chalk.red;
-      healthStr = c(`${h}%`);
-    }
-    const phaseLabel = `${chalk.dim('Phase:')}  ${chalk.whiteBright(project.sprintPhase)}`;
-    if (healthStr) {
-      const healthLabel = `${chalk.dim('Health:')} ${healthStr}`;
-      const pad = width - stripAnsi(phaseLabel).length - stripAnsi(healthLabel).length;
-      console.log(`  ${phaseLabel}${' '.repeat(Math.max(1, pad))}${healthLabel}`);
-    } else {
-      console.log(`  ${phaseLabel}`);
-    }
+  console.log(`  ${chalk.bold.magentaBright('CodeThon')} ${chalk.dim('interactive mode')}  ${providerReady ? chalk.greenBright('AI ready') : chalk.yellowBright('setup needed')}`);
+  console.log(`  ${chalk.dim('Project:')} ${chalk.whiteBright(project?.name || 'No active project')}  ${chalk.dim('Phase:')} ${chalk.whiteBright(project?.sprintPhase || 'Not started')}`);
+  if (project?.healthScore) {
+    const h = project.healthScore.overall;
+    const c = h >= 80 ? chalk.greenBright : h >= 50 ? chalk.yellowBright : chalk.redBright;
+    console.log(`  ${chalk.dim('Health:')} ${c(`${h}%`)}  ${chalk.dim('Stack:')} ${chalk.whiteBright(project.stack || 'Unknown')}`);
   }
-  console.log(`  ${chalk.dim('Model:')}  ${chalk.whiteBright(llm.model || 'not set')}`);
+  console.log(`  ${chalk.dim('AI:')} ${chalk.whiteBright(`${getProviderDisplayName(llm.provider)} · ${llm.model || 'No model selected'}`)}`);
+  console.log(`  ${chalk.dim('Mode:')} ${modeHints}`);
+  console.log(`  ${chalk.dim('Next:')} ${chalk.cyanBright(actions || '/help  /auth  /plan')}`);
   console.log(`  ${chalk.dim(line)}`);
 }
 
+function pickSuggestion(): { cmd: string; desc: string; insert?: string } | null {
+  if (suggestions.length === 0) return null;
+  return suggestions[selectedSuggestion >= 0 ? selectedSuggestion : 0] || suggestions[0];
+}
+
+function applySuggestion(picked: { cmd: string; insert?: string }, runWhenComplete: boolean): void {
+  const insert = picked.insert || picked.cmd;
+  const commandName = insert.replace(/^\//, '').split(/\s+/)[0];
+  const entry = getCommandByName(commandName);
+
+  inputBuffer = insert;
+  cursorPos = inputBuffer.length;
+  suggestions = [];
+  selectedSuggestion = -1;
+  scrollOffset = 0;
+  suppressNextEmptySubmit = false;
+
+  if (runWhenComplete && !entry?.requiresArg) {
+    void submit();
+    return;
+  }
+
+  if (entry?.requiresArg && !inputBuffer.endsWith(' ')) {
+    inputBuffer += ' ';
+    cursorPos = inputBuffer.length;
+  }
+
+  renderInput();
+}
+
+function printActiveCommand(input: string): void {
+  const width = Math.max(60, Math.min(110, (process.stdout.columns || 88) - 4));
+  const clipped = input.length > width - 16 ? `${input.slice(0, width - 17)}…` : input;
+  const padded = clipped.padEnd(Math.max(0, width - 12));
+  console.log(`  ${chalk.cyan('┌')}${chalk.cyan('─'.repeat(width - 2))}${chalk.cyan('┐')}`);
+  console.log(`  ${chalk.cyan('│')} ${chalk.bold.whiteBright('Running')} ${chalk.cyanBright(padded)}${chalk.cyan('│')}`);
+  console.log(`  ${chalk.cyan('└')}${chalk.cyan('─'.repeat(width - 2))}${chalk.cyan('┘')}`);
+  console.log('');
+}
+
+function compactContextLine(): void {
+  const state = new StateManager();
+  const project = state.getProject();
+  const llm = getLLMConfig();
+  const providerReady = Boolean(llm.apiKey) || llm.provider === 'ollama' || llm.provider === 'local-server';
+  const actions = buildSuggestedActions(llm, project).slice(0, 2).map(action => `/${action.command.split(' ')[0]}`).join(' ');
+  const readiness = providerReady ? chalk.greenBright('ready') : chalk.yellowBright('setup');
+  console.log(
+    `  ${chalk.dim('context')} ${readiness}` +
+    `  ${chalk.dim('project')} ${chalk.whiteBright(project?.name || 'none')}` +
+    `  ${chalk.dim('model')} ${chalk.whiteBright(llm.model || 'none')}` +
+    `  ${chalk.dim('next')} ${chalk.cyanBright(actions || '/help')}`
+  );
+}
+
+function shouldUseSimpleRepl(): boolean {
+  if (!process.stdin.isTTY || !process.stdout.isTTY) return true;
+  if (process.env.CODETHON_SIMPLE_REPL === '1') return true;
+  return false;
+}
+
+function getSuggestionMetrics(): { boxWidth: number; cmdWidth: number; descWidth: number } {
+  const terminalWidth = process.stdout.columns || 80;
+  const boxWidth = Math.max(52, terminalWidth - 4);
+  const contentWidth = boxWidth - 4;
+  const cmdWidth = Math.max(20, Math.min(32, Math.floor(contentWidth * 0.34)));
+  const descWidth = Math.max(8, contentWidth - cmdWidth - 3);
+  return { boxWidth, cmdWidth, descWidth };
+}
+
+function clearRenderArea(): void {
+  process.stdout.write('\r');
+  if (prevCursorRow > 0) moveCursor(process.stdout, 0, -prevCursorRow);
+  clearScreenDown(process.stdout);
+}
+
+function detachInputHandlers(): void {
+  process.stdin.removeListener('keypress', handleKeypress);
+  try { process.stdin.setRawMode(false); } catch {}
+}
+
+function attachInputHandlers(): void {
+  resetSimplePromptSession();
+  if (!keypressEventsBound) {
+    (readline as any).emitKeypressEvents(process.stdin);
+    process.stdin.setEncoding('utf8');
+    keypressEventsBound = true;
+  }
+  process.stdin.removeListener('keypress', handleKeypress);
+  process.stdin.on('keypress', handleKeypress);
+  try { process.stdin.setRawMode(true); } catch {}
+  process.stdin.resume();
+}
+
+function insertTextAtCursor(text: string): void {
+  if (!text) return;
+  inputBuffer = inputBuffer.slice(0, cursorPos) + text + inputBuffer.slice(cursorPos);
+  cursorPos += text.length;
+  suppressNextEmptySubmit = false;
+  renderInput();
+}
+
 function renderInput(): void {
+  if (commandInFlight) return;
+
   computeSuggestions();
-  const fullText = promptStr + inputBuffer;
-  const inputHeight = fullText.split('\n').length;
+  const terminalWidth = process.stdout.columns || 80;
+  const layout = buildPromptLayout(inputBuffer, cursorPos, terminalWidth, promptWidth);
+  const inputLines = layout.lines;
+  const { boxWidth, cmdWidth, descWidth } = getSuggestionMetrics();
   const visibleSugs = Math.min(suggestions.length, MAX_VISIBLE);
   const suggHeight = suggestions.length > 0 ? visibleSugs + 2 : 0;
 
-  // Move cursor up to the top of our render area
-  process.stdout.write('\r');
-  if (prevCursorLine > 0) moveCursor(process.stdout, 0, -prevCursorLine);
+  clearRenderArea();
 
-  // Clear everything from here to end of screen
-  clearScreenDown(process.stdout);
+  process.stdout.write(`${promptStr}${inputLines[0] ?? ''}\n`);
+  for (let i = 1; i < inputLines.length; i++) {
+    process.stdout.write(`${inputLines[i]}\n`);
+  }
 
-  // Write the input line(s)
-  process.stdout.write(fullText + '\n');
-
-  // Write suggestion box
   if (suggestions.length > 0) {
     const border = theme.rgb(theme.colors.border);
-    process.stdout.write(`  ${border}\u250C${'\u2500'.repeat(BOX_W - 2)}\u2510${theme.reset()}\n`);
+    process.stdout.write(`  ${border}\u250C${'\u2500'.repeat(boxWidth - 2)}\u2510${theme.reset()}\n`);
 
     for (let i = 0; i < visibleSugs; i++) {
       const idx = scrollOffset + i;
@@ -216,39 +375,54 @@ function renderInput(): void {
       const selected = idx === selectedSuggestion;
       const prefix = selected ? '\u25B6 ' : '  ';
       const cmdRaw = s.cmd;
-      const cmdPadded = cmdRaw.length >= CMD_W ? cmdRaw : cmdRaw + ' '.repeat(CMD_W - cmdRaw.length);
+      const truncatedCmd = truncateText(cmdRaw, cmdWidth);
+      const cmdPadded = truncatedCmd.length >= cmdWidth ? truncatedCmd : truncatedCmd + ' '.repeat(cmdWidth - truncatedCmd.length);
       const cmdStyled = selected
         ? theme.rgb(theme.colors.textBright) + cmdPadded + theme.reset()
         : theme.style(cmdPadded, 'primary');
-      const descMax = DESC_W - (selected ? 1 : 0);
-      const descRaw = s.desc.length > descMax ? s.desc.slice(0, descMax - 1) + '\u2026' : s.desc;
-      const descPadded = descRaw + ' '.repeat(DESC_W - stripAnsi(descRaw).length);
+      const descMax = Math.max(4, descWidth - (selected ? 1 : 0));
+      const descRaw = truncateText(s.desc, descMax);
+      const descPadded = descRaw + ' '.repeat(Math.max(0, descWidth - stripAnsi(descRaw).length));
       const descStyled = theme.style(descPadded, 'textDim');
       const bg = selected ? theme.bgRgb({ r: 40, g: 40, b: 50 }) : '';
       const line = `  ${border}\u2502${theme.reset()} ${bg}${prefix}${cmdStyled} ${descStyled}${theme.reset()} ${border}\u2502${theme.reset()}`;
       process.stdout.write(line + '\n');
     }
 
-    process.stdout.write(`  ${border}\u2514${'\u2500'.repeat(BOX_W - 2)}\u2518${theme.reset()}\n`);
+    process.stdout.write(`  ${border}\u2514${'\u2500'.repeat(boxWidth - 2)}\u2518${theme.reset()}\n`);
   }
 
-  // Reposition cursor to editing position
-  const cursorLineNum = inputBuffer.slice(0, cursorPos).split('\n').length - 1;
-  const cursorInLine = inputBuffer.slice(0, cursorPos).split('\n').pop()!.length;
-  const linesUp = suggHeight + inputHeight - cursorLineNum;
+  const linesUp = inputLines.length + suggHeight - layout.cursorRow;
   moveCursor(process.stdout, 0, -linesUp);
-  const col = cursorLineNum === 0 ? promptWidth + cursorInLine : cursorInLine;
-  cursorTo(process.stdout, col);
+  cursorTo(process.stdout, layout.cursorCol);
 
-  prevCursorLine = cursorLineNum;
+  prevCursorRow = layout.cursorRow;
 }
 
-// ── Input handling ──────────────────────────────────────────────
-function needsInquirer(input: string): boolean {
-  if (input.startsWith('/')) return INQUIRER_CMDS.has(input.split(/\s+/)[0].toLowerCase());
-  const m = input.match(/^ct\s+(\S+)/i);
-  if (m) return INQUIRER_CT.has(m[1].toLowerCase());
-  return false;
+async function ensureReplAiReady(commandLabel: string): Promise<boolean> {
+  const { validateProviderConfig } = await import('../utils/config');
+  const check = validateProviderConfig();
+  if (check.ok) return true;
+
+  logger.warn(`${commandLabel} needs a configured AI provider.`);
+  logger.info(check.message);
+  logger.info(`  ${chalk.dim('Run')} ${chalk.cyanBright('/auth add')} ${chalk.dim('or')} ${chalk.cyanBright('/onboard')} ${chalk.dim('to finish setup.')}`);
+
+  if (!process.stdout.isTTY || !process.stdin.isTTY) {
+    return false;
+  }
+
+  const openSetup = await promptConfirm({
+    message: 'Open the guided setup now?',
+    defaultValue: true,
+  });
+
+  if (!openSetup) return false;
+
+  const result = await onboardCommand(false);
+  if (!result.success) return false;
+
+  return validateProviderConfig().ok;
 }
 
 async function handleInput(input: string): Promise<void> {
@@ -264,10 +438,17 @@ async function handleInput(input: string): Promise<void> {
     console.log('');
     process.exit(0);
   }
-  if (trimmed === '/help') { showCategorizedReplHelp(); return; }
+  if (trimmed === '/') {
+    showCommandSuggestions('/');
+    return;
+  }
+  if (trimmed === '/help' || trimmed === '/commands' || trimmed === '/?') { showCategorizedReplHelp(); return; }
   if (trimmed === '/clear') { clearCommand(); return; }
 
   if (trimmed.startsWith('/')) {
+    if (AI_REPL_COMMANDS.has(cmd) && !(await ensureReplAiReady(cmd))) {
+      return;
+    }
     if (cmd === '/explain') {
       if (!args.length) { logger.warn('Usage: /explain <file>'); return; }
       await explainCommand(args.join(' '));
@@ -283,55 +464,195 @@ async function handleInput(input: string): Promise<void> {
     } else if (cmd === '/run') {
       if (!args.length) { logger.warn('Usage: /run <command>'); return; }
       await runCommand(args, askMode);
+    } else if (cmd === '/auth') {
+      await handleAuth(args);
     } else {
       const handler = CMD_HANDLERS[cmd];
       if (handler) {
         if (args.length) await handler(...args);
         else await handler();
-      } else logger.warn(`Unknown: ${cmd}. Try /help.`);
+      } else if (args.length === 0) {
+        showCommandSuggestions(cmd);
+      } else {
+        logger.warn(`Unknown: ${cmd}. Try /help.`);
+      }
     }
   } else if (/^ct\s+/i.test(trimmed)) {
     const rest = trimmed.slice(3).trim();
     const rp = rest.split(/\s+/);
     const entry = CT_HANDLERS[rp[0].toLowerCase()];
     if (entry) {
+      const ctCommand = rp[0].toLowerCase();
+      if (['plan', 'roadmap', 'architect', 'build', 'execute', 'debug', 'deploy', 'readme', 'launch', 'startup', 'learn', 'analyze', 'autofix', 'summarize', 'recover', 'explain'].includes(ctCommand)) {
+        if (!(await ensureReplAiReady(`ct ${ctCommand}`))) {
+          return;
+        }
+      }
       if (entry.needsArg && !rp.slice(1).length) {
         logger.warn(`Usage: ct ${rp[0]} <argument>`);
         return;
       }
-      const subCmd = rp[0].toLowerCase();
+      const subCmd = ctCommand;
       if (subCmd === 'build') await buildCommand(rp.slice(1).join(' '), askMode, dryRunMode);
       else if (subCmd === 'autofix') await autofixCommand(askMode, dryRunMode);
       else if (subCmd === 'execute') await executeCommand(rp.slice(1).join(' '), askMode, dryRunMode);
       else if (subCmd === 'run') await runCommand(rp.slice(1), askMode);
+      else if (subCmd === 'auth') await handleAuth(rp.slice(1));
       else await entry.fn(...rp.slice(1));
     } else {
+      if (!(await ensureReplAiReady('AI request'))) {
+        return;
+      }
       await naturalLanguageCommand(rest);
     }
   } else {
+    const entry = getCommandByName(cmd);
+    if (entry) {
+      if (AI_COMMAND_NAMES.has(entry.name) && !(await ensureReplAiReady(entry.name))) {
+        return;
+      }
+      if (entry.requiresArg && !args.length) {
+        logger.warn(`Usage: ${entry.usage}`);
+        return;
+      }
+
+      if (entry.name === 'help') {
+        showCategorizedReplHelp();
+      } else if (entry.name === 'clear') {
+        clearCommand();
+      } else if (entry.name === 'exit') {
+        console.log('');
+        logger.info('Goodbye.');
+        console.log('');
+        process.exit(0);
+      } else if (entry.name === 'build') {
+        await buildCommand(args.join(' '), askMode, dryRunMode);
+      } else if (entry.name === 'autofix') {
+        await autofixCommand(askMode, dryRunMode);
+      } else if (entry.name === 'execute') {
+        await executeCommand(args.join(' '), askMode, dryRunMode);
+      } else if (entry.name === 'run') {
+        if (!args.length) { logger.warn('Usage: run <command>'); return; }
+        await runCommand(args, askMode);
+      } else if (entry.name === 'auth') {
+        await handleAuth(args);
+      } else {
+        const handler = CT_HANDLERS[entry.name];
+        if (handler) await handler.fn(...args);
+      }
+      return;
+    }
+
+    if (args.length === 0) {
+      const matches = findCommandSuggestions(trimmed);
+      if (matches.length > 0) {
+        showCommandSuggestions(trimmed, false);
+        return;
+      }
+    }
+
+    if (!(await ensureReplAiReady('AI request'))) {
+      return;
+    }
     await naturalLanguageCommand(trimmed);
   }
 }
 
+async function simpleReplLoop(): Promise<void> {
+  try { process.stdin.setRawMode(false); } catch {}
+  let printedBanner = false;
+  let lastSetupWarning = '';
+
+  while (true) {
+    if (!printedBanner) {
+      console.log('');
+      contextBanner();
+      console.log('');
+      printedBanner = true;
+    } else if (suppressNextContextLine) {
+      suppressNextContextLine = false;
+    } else {
+      compactContextLine();
+    }
+
+    const { validateProviderConfig } = await import('../utils/config');
+    const check = validateProviderConfig();
+    if (!check.ok && check.message !== lastSetupWarning) {
+      logger.warn(check.message.replace('No API key', 'No API key configured'));
+      console.log('');
+      lastSetupWarning = check.message;
+    }
+
+    let answer = '';
+    try {
+      answer = await promptLine(`${promptStr}`);
+    } catch (error) {
+      if (error instanceof PromptCancelledError) {
+        console.log('');
+        logger.info('Goodbye.');
+        console.log('');
+        return;
+      }
+      throw error;
+    }
+
+    const trimmed = answer.trim();
+    if (!trimmed) {
+      continue;
+    }
+
+    if (trimmed === '/exit' || trimmed === '/quit') {
+      console.log('');
+      logger.info('Goodbye.');
+      console.log('');
+      return;
+    }
+
+    try {
+      await handleInput(trimmed);
+    } catch (e: any) {
+      if (e instanceof PromptCancelledError) {
+        logger.warn('Cancelled.');
+      } else {
+        const { formatApiError } = await import('../utils/api-error');
+        logger.error(formatApiError(e));
+      }
+    }
+  }
+}
+
+async function handleAuth(args: string[]): Promise<void> {
+  const sub = args[0]?.toLowerCase();
+  if (!sub || sub === 'list') {
+    await authListCommand();
+  } else if (sub === 'add') {
+    await authAddCommand();
+  } else if (sub === 'test') {
+    await authTestCommand(args[1]);
+  } else if (sub === 'switch') {
+    await authSwitchCommand();
+  } else if (sub === 'remove') {
+    await authRemoveCommand(args[1]);
+  } else if (sub === 'logout') {
+    await authLogoutCommand();
+  } else {
+    logger.warn(`Unknown auth subcommand: ${sub}. Try: add, list, test, switch, remove, logout`);
+  }
+}
+
 async function submit(): Promise<void> {
-  const useSuggestion = selectedSuggestion >= 0
-    && suggestions[selectedSuggestion]
-    && inputBuffer.length >= 1;
+  if (commandInFlight) return;
 
-  const input = useSuggestion ? suggestions[selectedSuggestion].cmd : inputBuffer;
+  const input = inputBuffer;
 
-  // Visually clear the rendered area (input + suggestion box) first,
-  // before any handler output or state reset
-  process.stdout.write('\r');
-  if (prevCursorLine > 0) moveCursor(process.stdout, 0, -prevCursorLine);
-  clearScreenDown(process.stdout);
+  clearRenderArea();
 
   suggestions = [];
   selectedSuggestion = -1;
   scrollOffset = 0;
   inputBuffer = '';
   cursorPos = 0;
-  prevCursorLine = 0;
+  prevCursorRow = 0;
 
   console.log('');
 
@@ -343,47 +664,53 @@ async function submit(): Promise<void> {
   }
 
   if (trimmed) {
-    const inq = needsInquirer(trimmed);
-    if (inq) {
-      process.stdin.removeListener('keypress', handleKeypress);
-      try { process.stdin.setRawMode(false); } catch {}
-    }
+    commandInFlight = true;
+    detachInputHandlers();
     try {
+      if (trimmed !== '/' && !trimmed.startsWith('/help') && !trimmed.startsWith('/commands') && !trimmed.startsWith('/?')) {
+        printActiveCommand(trimmed);
+      }
       await handleInput(trimmed);
     } catch (e: any) {
-      const { formatApiError } = await import('../utils/api-error');
-      logger.error(formatApiError(e));
+      if (e instanceof PromptCancelledError) {
+        logger.warn('Cancelled.');
+      } else {
+        const { formatApiError } = await import('../utils/api-error');
+        logger.error(formatApiError(e));
+      }
+    } finally {
+      commandInFlight = false;
+      attachInputHandlers();
+      suppressNextEmptySubmit = true;
     }
-    if (inq) {
-      (readline as any).emitKeypressEvents(process.stdin);
-      process.stdin.on('keypress', handleKeypress);
-      try { process.stdin.setRawMode(true); } catch {}
-    }
-    // Ensure stdin stays in flowing mode on Windows after long-running commands
-    process.stdin.resume();
+  }
+
+  if (suppressNextContextLine) {
+    suppressNextContextLine = false;
+    prevCursorRow = 0;
+    renderInput();
+    return;
   }
 
   contextBanner();
   console.log('');
-  process.stdout.write(promptStr);
-  prevCursorLine = 0;
+  prevCursorRow = 0;
+  renderInput();
 }
 
 function handleKeypress(str: string, key: any): void {
   if (!key) key = {};
 
   if (key.ctrl && key.name === 'c') {
-    process.stdout.write('\r');
-    if (prevCursorLine > 0) moveCursor(process.stdout, 0, -prevCursorLine);
-    clearScreenDown(process.stdout);
+    clearRenderArea();
     inputBuffer = '';
     cursorPos = 0;
     suggestions = [];
     selectedSuggestion = -1;
     scrollOffset = 0;
-    prevCursorLine = 0;
+    prevCursorRow = 0;
     process.stdout.write('^C\n');
-    process.stdout.write(promptStr);
+    renderInput();
     return;
   }
 
@@ -397,7 +724,19 @@ function handleKeypress(str: string, key: any): void {
   }
 
   if (key.name === 'return' && !key.shift) {
-    submit();
+    if (suppressNextEmptySubmit && inputBuffer.trim() === '') {
+      suppressNextEmptySubmit = false;
+      return;
+    }
+    const picked = pickSuggestion();
+    const inputIsOnlyCommandFragment = inputBuffer.trim().startsWith('/') && !inputBuffer.trim().includes(' ');
+    if (picked && inputIsOnlyCommandFragment && inputBuffer.trim() !== (picked.insert || picked.cmd)) {
+      suppressNextEmptySubmit = false;
+      applySuggestion(picked, true);
+      return;
+    }
+    suppressNextEmptySubmit = false;
+    void submit();
     return;
   }
 
@@ -409,6 +748,7 @@ function handleKeypress(str: string, key: any): void {
   }
 
   if (key.name === 'backspace') {
+    suppressNextEmptySubmit = false;
     if (cursorPos > 0) {
       inputBuffer = inputBuffer.slice(0, cursorPos - 1) + inputBuffer.slice(cursorPos);
       cursorPos--;
@@ -418,6 +758,7 @@ function handleKeypress(str: string, key: any): void {
   }
 
   if (key.name === 'delete') {
+    suppressNextEmptySubmit = false;
     if (cursorPos < inputBuffer.length) {
       inputBuffer = inputBuffer.slice(0, cursorPos) + inputBuffer.slice(cursorPos + 1);
       renderInput();
@@ -448,20 +789,38 @@ function handleKeypress(str: string, key: any): void {
   }
 
   if (key.name === 'tab') {
-    if (suggestions.length > 0) {
-      selectedSuggestion = (selectedSuggestion + 1) % suggestions.length;
+    const picked = pickSuggestion();
+    if (picked) {
+      const words = inputBuffer.split(/\s+/);
+      const lastWord = words[words.length - 1] || '';
+      const prefix = inputBuffer.slice(0, inputBuffer.length - lastWord.length);
+      inputBuffer = prefix + (picked.insert || picked.cmd) + ' ';
+      cursorPos = inputBuffer.length;
+      suggestions = [];
+      selectedSuggestion = -1;
+      scrollOffset = 0;
+      suppressNextEmptySubmit = false;
       renderInput();
     } else {
       const words = inputBuffer.split(/\s+/);
       const lastWord = words[words.length - 1] || '';
       const matches = ALL_CMDS.filter(c => c.toLowerCase().startsWith(lastWord.toLowerCase()) && c.length > lastWord.length);
-      if (matches.length === 1) {
-        const prefix = inputBuffer.slice(0, inputBuffer.length - lastWord.length);
-        inputBuffer = prefix + matches[0] + ' ';
-        cursorPos = inputBuffer.length;
-        renderInput();
-      }
+          if (matches.length === 1) {
+            const prefix = inputBuffer.slice(0, inputBuffer.length - lastWord.length);
+            inputBuffer = prefix + matches[0] + ' ';
+            cursorPos = inputBuffer.length;
+            suppressNextEmptySubmit = false;
+            renderInput();
+          }
     }
+    return;
+  }
+
+  if (key.name === 'escape') {
+    suggestions = [];
+    selectedSuggestion = -1;
+    scrollOffset = 0;
+    renderInput();
     return;
   }
 
@@ -481,6 +840,7 @@ function handleKeypress(str: string, key: any): void {
       historyIdx++;
       inputBuffer = history[history.length - historyIdx];
       cursorPos = inputBuffer.length;
+      suppressNextEmptySubmit = false;
       renderInput();
     }
     return;
@@ -501,6 +861,7 @@ function handleKeypress(str: string, key: any): void {
       historyIdx--;
       inputBuffer = historyIdx === 0 ? '' : history[history.length - historyIdx];
       cursorPos = inputBuffer.length;
+      suppressNextEmptySubmit = false;
       renderInput();
     }
     return;
@@ -511,9 +872,8 @@ function handleKeypress(str: string, key: any): void {
     console.log('');
     contextBanner();
     console.log('');
-    process.stdout.write(promptStr + inputBuffer);
-    const bufLines = inputBuffer.split('\n').length;
-    prevCursorLine = bufLines - 1;
+    prevCursorRow = 0;
+    renderInput();
     return;
   }
 
@@ -527,9 +887,26 @@ function handleKeypress(str: string, key: any): void {
     }
     // Ignore control characters that aren't bound
     if (key.ctrl) return;
-    inputBuffer = inputBuffer.slice(0, cursorPos) + str + inputBuffer.slice(cursorPos);
-    cursorPos++;
-    renderInput();
+    insertTextAtCursor(str);
+    return;
+  }
+
+  if (str && str.length > 1) {
+    const customHandler = customKeys.lookup(key.name || '', !!key.ctrl, !!key.shift);
+    if (customHandler) {
+      customHandler();
+      renderInput();
+      return;
+    }
+    if (key.ctrl) return;
+
+    const normalized = str
+      .replace(/\r\n/g, '\n')
+      .replace(/\r/g, '\n')
+      .replace(/\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])/g, '');
+
+    if (!normalized) return;
+    insertTextAtCursor(normalized);
     return;
   }
 }
@@ -537,25 +914,28 @@ function handleKeypress(str: string, key: any): void {
 export async function replCommand(ask = false, dryRun = false): Promise<void> {
   askMode = ask;
   dryRunMode = dryRun;
+  theme.setMode(getThemeMode());
   logger.highlight('  Type /help for commands, or just ask anything.');
   console.log('');
+
+  if (shouldUseSimpleRepl()) {
+    await simpleReplLoop();
+    return;
+  }
+
   contextBanner();
   console.log('');
 
-  // First-run check: if no API keys detected, auto-run onboard guide
-  const { hasAnyApiKey } = await import('../utils/api-error');
-  if (!hasAnyApiKey()) {
-    logger.info('No API keys detected. Running setup guide...');
-    console.log('');
-    await onboardCommand();
-    console.log('');
-    contextBanner();
+  const { validateProviderConfig } = await import('../utils/config');
+  const check = validateProviderConfig();
+  if (!check.ok) {
+    logger.warn(check.message.replace('No API key', 'No API key configured'));
     console.log('');
   }
 
   inputBuffer = '';
   cursorPos = 0;
-  prevCursorLine = 0;
+  prevCursorRow = 0;
   historyIdx = 0;
   suggestions = [];
   selectedSuggestion = -1;
@@ -564,14 +944,23 @@ export async function replCommand(ask = false, dryRun = false): Promise<void> {
   // Register custom keybindings
   customKeys.register('ctrl+p', () => {
     theme.toggle();
+    setThemeMode(theme.isDark() ? 'dark' : 'light');
     logger.info(`Theme: ${theme.isDark() ? 'dark' : 'light'}`);
   });
 
-  (readline as any).emitKeypressEvents(process.stdin);
-  process.stdin.on('keypress', handleKeypress);
-  try { process.stdin.setRawMode(true); } catch {}
-  process.stdin.resume();
+  if (!resizeHandlerBound) {
+    process.stdout.on('resize', () => {
+      if (commandInFlight) return;
+      process.stdout.write('\x1bc');
+      console.log('');
+      contextBanner();
+      console.log('');
+      prevCursorRow = 0;
+      renderInput();
+    });
+    resizeHandlerBound = true;
+  }
 
-  process.stdout.write(promptStr);
-  prevCursorLine = 0;
+  attachInputHandlers();
+  renderInput();
 }

@@ -1,5 +1,6 @@
-import { executeCommand, isCommandAllowed, setAllowedCommands } from './executor';
-export { executeCommand, isCommandAllowed, setAllowedCommands };
+import { executeCommand } from './executor';
+import { isAllowedCommand } from '../security/policy';
+export { executeCommand, isAllowedCommand };
 export type { ExecResult } from './executor';
 
 const activeRuntime = { name: 'local' as const };

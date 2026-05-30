@@ -28,6 +28,10 @@ function center(text: string, width = 64): string {
   return ' '.repeat(pad) + text;
 }
 
+function terminalRuleWidth(max = 110): number {
+  return Math.max(60, Math.min(max, (process.stdout.columns || 88) - 4));
+}
+
 export function log(level: LogLevel, message: string): void {
   const prefix = PREFIXES[level];
   const colorize = COLORS[level];
@@ -35,7 +39,7 @@ export function log(level: LogLevel, message: string): void {
 }
 
 export function section(title: string): void {
-  const line = chalk.bold.cyan('\u2500'.repeat(60));
+  const line = chalk.bold.cyan('\u2500'.repeat(terminalRuleWidth()));
   console.log('');
   console.log(`  ${line}`);
   console.log(`  ${chalk.bold.cyan('\u25C6')}  ${chalk.bold.whiteBright(title)}`);
@@ -50,7 +54,7 @@ export function subsection(title: string): void {
 }
 
 export function divider(): void {
-  console.log(`  ${chalk.dim('\u2500'.repeat(52))}`);
+  console.log(`  ${chalk.dim('\u2500'.repeat(terminalRuleWidth(96)))}`);
 }
 
 export function commandBlock(command: string, description?: string): void {
