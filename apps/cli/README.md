@@ -1,154 +1,170 @@
 # CodeThon CLI
 
-**AI-native execution orchestration for developers and hackathon builders — plan, build, debug, and ship from your terminal.**
-
-<p align="center">
-  <a href="https://www.npmjs.com/package/codethon-cli"><img src="https://img.shields.io/npm/v/codethon-cli?style=flat&label=npm&color=06b6d4" alt="npm version"></a>
-  <a href="https://www.npmjs.com/package/codethon-cli"><img src="https://img.shields.io/npm/dm/codethon-cli?style=flat&color=8888a0" alt="npm downloads"></a>
-  <a href="https://nodejs.org"><img src="https://img.shields.io/node/v/codethon-cli?style=flat&color=22c55e" alt="node version"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/npm/l/codethon-cli?style=flat&color=a855f7" alt="license"></a>
-</p>
+Provider-agnostic AI coding agent for the terminal. CodeThon helps you configure a model, understand a repo, plan the work, execute concrete tasks, recover from failures, and ship from one CLI.
 
 ```bash
 npm install -g codethon-cli
-ct init
+ct
 ```
 
-## Quick Start
+Current package: `codethon-cli@1.0.0`
+
+## First Run
+
+Run `ct`.
+
+If no working provider is configured, CodeThon starts guided setup:
+
+1. Choose OpenAI, Anthropic, NVIDIA, Groq, DeepSeek, Together, Ollama, or LM Studio.
+2. Enter an API key when the provider requires one.
+3. Validate the key.
+4. Select a model.
+5. Run a test request.
+6. Save config and show next actions.
+
+CodeThon stores configuration in the user's home directory, not inside the npm package folder and not inside your source tree.
+
+## Interactive Mode
+
+```text
+CodeThon >
+```
+
+| Input | Result |
+|---|---|
+| `/` | Open the slash-command palette |
+| `/p` | Filter commands such as `/plan` and `/profile` |
+| `/help` | Show categorized command help |
+| plain English | Ask the configured AI provider |
+
+## Common Workflow
 
 ```bash
-# Interactive wizard — define your idea, stack, AI model
+ct auth add
 ct init
-
-# Generate a combined roadmap + architecture plan
-ct plan --stack nextjs+tailwind --feature "user authentication"
-
-# Scaffold a full Next.js + Tailwind starter
-ct scaffold my-app
-cd my-app
-
-# Autonomous build — it plans, writes code, runs builds, fixes errors
-ct execute "add a signup page with email authentication"
+ct plan "build a Next.js dashboard with Supabase auth"
+ct execute "implement the dashboard shell and auth flow"
+ct profile
+ct doctor
+ct review
 ```
 
-## Why CodeThon CLI?
+Inside the REPL, use slash commands:
 
-Most AI coding tools are **chatbots** — you describe what you want, copy the code, paste it, run the build, copy errors back, repeat. CodeThon CLI is different.
-
-| Other tools | CodeThon CLI |
-|---|---|
-| You paste AI output → terminal | CLI **writes files directly** |
-| You manually run build → copy errors | CLI **auto-fixes build errors** |
-| You approve every single step | CLI **loops autonomously until done** |
-| Generic chat interface | **Hackathon-tailored** (24h/48h/72h timelines) |
-
-**CodeThon CLI is an autonomous engineering agent that lives in your terminal.** It reads your codebase, writes files, runs commands, searches the web, and fixes its own mistakes — all in a secure, approval-gated execution loop.
-
-## Features
-
-- **Autonomous Execution Loop** — 20-iteration agent that plans, researches, writes files, runs commands, and auto-fixes build errors. State saved every iteration; resumes on crash.
-- **Multi-LLM Router** — 7 providers (OpenAI, Anthropic, Groq, DeepSeek, Together, Ollama, LocalServer) with auto-detect, use-case ranking, and fallback chain. Defaults to free NVIDIA-hosted models.
-- **Rich Terminal UI** — agent activity feed, token-by-token streaming with syntax highlighting, context banner, per-tool timing.
-- **Interactive REPL** — persistent conversational mode with live command suggestions, multi-line input, and project context banner.
-- **Safety-First Execution** — allowlist + blocklist + shell injection protection + `--ask` approval + `--dry-run` preview.
-- **Self-Healing Build Pipeline** — auto-fix build errors with targeted `oldString`→`newString` edits (no full-file rewrites).
-- **Project Health Scoring** — 6-dimension health tracker with snapshot history.
-- **Web Intelligence** — built-in web search and URL crawling, no API keys needed.
-- **33 CLI Commands** — init, plan, build, execute, debug, autofix, deploy, launch, scaffold, git, test, profile, and more.
+```text
+/auth add
+/init
+/plan build a Next.js dashboard with Supabase auth
+/execute implement the dashboard shell and auth flow
+/profile
+/doctor
+```
 
 ## Commands
 
-### Project Setup
-| Command | What it does |
+### Setup
+
+| Command | Purpose |
 |---|---|
-| `ct init` | Interactive wizard: define idea, pick stack + timeline + AI model |
-| `ct scaffold [dir]` | Generate full-stack starter with 4 templates |
-| `ct status` | Show project health, model, phase, configuration |
+| `ct onboard` | Run guided setup again |
+| `ct auth add` | Add and validate a provider credential |
+| `ct auth list` | Show configured providers and active model |
+| `ct auth test [provider]` | Test provider authentication |
+| `ct auth switch` | Switch provider and model |
+| `ct auth remove [provider]` | Remove a provider credential |
+| `ct auth logout` | Remove credentials and reset auth state |
+| `ct model` | Browse and switch models |
+| `ct doctor` | Diagnose Node, Git, config, auth, network, and project health |
 
-### AI & Planning
-| Command | What it does |
+### Plan And Understand
+
+| Command | Purpose |
 |---|---|
-| `ct plan` | Combined roadmap + architecture (accepts `--stack`, `--feature`) |
-| `ct learn` | Mentor mode — ask anything, get a guided tutorial |
-| `ct startup` | Analyze startup/business potential |
-| `ct deploy` | Deploy to Vercel or get a deployment guide |
-| `ct launch` | Generate demo-day assets (pitch, submission, social posts) |
+| `ct init` | Create or register a project workspace |
+| `ct plan [goal]` | Stream roadmap and architecture generation |
+| `ct roadmap` | Generate phases and milestones |
+| `ct architect` | Generate architecture and stack guidance |
+| `ct analyze [dir]` | Scan project structure and stream an AI summary |
+| `ct explain <file>` | Explain a file and its risks |
+| `ct summarize` | Summarize project health, blockers, and priorities |
 
-### Code Generation & Build
-| Command | What it does |
+### Build And Repair
+
+| Command | Purpose |
 |---|---|
-| `ct execute <goal>` | Full autonomous agent — plans, writes, runs, loops until done |
-| `ct build [goal]` | Three-stage builder: analyze → build → auto-fix |
-| `ct run <command>` | Run any shell command with live streaming preview |
-| `ct model` | Switch AI model interactively |
+| `ct execute <goal>` | Run the autonomous agent loop on a concrete task |
+| `ct build [goal]` | Generate and apply code with build repair |
+| `ct autofix` | Run build/type checks and apply targeted fixes |
+| `ct debug` | Analyze errors and stream fix guidance |
+| `ct run <cmd>` | Run a shell command through policy gates |
+| `ct scaffold [dir]` | Generate a starter project |
 
-### Debug & Fix
-| Command | What it does |
+### Inspect, Recover, Ship
+
+| Command | Purpose |
 |---|---|
-| `ct debug [error]` | Auto-collect errors → AI analysis → auto-fix |
-| `ct autofix` | Scan project, detect build errors, fix autonomously |
-| `ct emergency` | Demo-day crisis mode |
-| `ct diff` | Full `git diff` with syntax-colored output |
-| `ct review` | Quick `git diff --stat` overview |
+| `ct profile` | Find performance issues and code smells |
+| `ct review` | Inspect current git changes |
+| `ct diff` | Show the full git diff |
+| `ct checkpoint` | Save, list, and restore recovery points |
+| `ct recover` | Rebuild project context from local files |
+| `ct deploy` | Generate deployment guidance |
+| `ct readme` | Generate or refresh README.md |
+| `ct launch` | Generate demo script and submission copy |
+| `ct startup` | Analyze product and go-to-market potential |
+| `ct learn` | Ask a concept question and get a guided tutorial |
 
-### Intelligence & Recovery
-| Command | What it does |
+## Providers
+
+| Provider | Credential |
 |---|---|
-| `ct doctor` | Full project diagnostics |
-| `ct explain <file>` | AI-powered code analysis |
-| `ct summarize` | Structured project status summary |
-| `ct recover` | Rebuild project context from broken state |
+| NVIDIA | `NVIDIA_API_KEY` |
+| OpenAI | `OPENAI_API_KEY` |
+| Anthropic | `ANTHROPIC_API_KEY` |
+| Groq | `GROQ_API_KEY` |
+| DeepSeek | `DEEPSEEK_API_KEY` |
+| Together AI | `TOGETHER_API_KEY` |
+| Ollama | none |
+| LM Studio / local server | none |
 
-### Advanced Features
-| Command | What it does |
-|---|---|
-| `ct git` | AI commit, PR, code review, branch naming |
-| `ct test` | Auto-generate tests, mutation testing, coverage |
-| `ct profile` | Performance profiling, code smell analysis |
-| `ct checkpoint` | Time-travel restore points, rollback |
-| `ct onboard` | Interactive environment setup |
+## Safety
 
-### Utilities
-| Command | What it does |
-|---|---|
-| `ct analyze [dir]` | Deep project scan: structure, issues, missing files |
-| `ct -h` | Show help |
-| `ct -V` | Show version |
-
-## Multi-LLM Router
-
-| Provider | API Key | Models |
-|---|---|---|
-| **NVIDIA** (default) | `NVIDIA_API_KEY` | DeepSeek V4 Flash (131K ctx), Nemotron Super 49B |
-| **OpenAI** | `OPENAI_API_KEY` | GPT-4o, GPT-4o Mini, o3, o4 Mini |
-| **Anthropic** | `ANTHROPIC_API_KEY` | Claude 3.5 Sonnet, Claude 3 Opus |
-| **Groq** (free) | `GROQ_API_KEY` | Mixtral 8x7B, Llama 3.3 70B |
-| **DeepSeek** | `DEEPSEEK_API_KEY` | DeepSeek Chat, DeepSeek Reasoner |
-| **Together** | `TOGETHER_API_KEY` | Llama 3.3 70B, Mixtral 8x22B |
-| **Ollama** (local) | None | Any local model |
-| **LocalServer** (local) | None | LM Studio, LocalAI |
-
-## Install
+- `--ask` gates writes and command execution.
+- `--dry-run` previews operations.
+- shell execution uses allowlisted binaries and blocked dangerous patterns.
+- child-process environments are filtered for common secret patterns.
+- provider credentials are stored outside project files.
+- `.env` placeholder writes are rejected.
 
 ```bash
-# Global install (recommended)
-npm install -g codethon-cli
-ct init
-
-# Direct execution
-npx codethon-cli init
+ct --ask execute "add password reset"
+ct --dry-run execute "refactor billing components"
 ```
 
 ## Development
 
 ```bash
 git clone https://github.com/zubershk/CodeThon-CLI
-cd CodeThon-CLI/apps/cli
+cd CodeThon-CLI
 npm install
 npm run build
-npm run test
+npm test
+npm run typecheck
+```
+
+Run the local build:
+
+```bash
+node apps/cli/dist/index.js
+```
+
+Inspect the npm package:
+
+```bash
+cd apps/cli
+npm pack --dry-run
 ```
 
 ## License
 
-MIT — Built for hackers. Ship fast. Win demo day.
+MIT

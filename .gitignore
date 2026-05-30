@@ -3,6 +3,7 @@ node_modules/
 apps/cli/node_modules/
 .pnpm-store/
 .npm/
+apps/cli/.npmrc
 
 # Build output
 dist/
