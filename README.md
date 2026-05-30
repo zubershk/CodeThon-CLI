@@ -73,6 +73,10 @@ Running `ct` with no command opens the interactive REPL:
 CodeThon >
 ```
 
+Use `ct` once to open the workspace, then use slash commands inside CodeThon.
+Standalone commands such as `ct doctor` still work for scripts, but the primary
+builder experience is `/init`, `/plan`, `/execute`, `/analyze`, and `/profile`.
+
 Useful input:
 
 | Input | Result |
@@ -97,18 +101,6 @@ CodeThon > /
 
 ## Common Workflow
 
-```bash
-ct auth add
-ct init
-ct plan "build a Next.js dashboard with Supabase auth"
-ct execute "implement the dashboard shell and auth flow"
-ct profile
-ct doctor
-ct review
-```
-
-Inside the REPL, use slash commands:
-
 ```text
 /auth add
 /init
@@ -125,53 +117,53 @@ Inside the REPL, use slash commands:
 
 | Command | Purpose |
 |---|---|
-| `ct onboard` | Run guided first-run setup again |
-| `ct auth add` | Add and validate a provider credential |
-| `ct auth list` | Show configured providers and active model |
-| `ct auth test [provider]` | Test provider authentication |
-| `ct auth switch` | Switch provider and model |
-| `ct auth remove [provider]` | Remove a provider credential |
-| `ct auth logout` | Remove credentials and reset auth state |
-| `ct model` | Browse and switch models |
-| `ct doctor` | Diagnose Node, Git, config, auth, network, and project health |
+| `/onboard` | Run guided first-run setup again |
+| `/auth add` | Add and validate a provider credential |
+| `/auth list` | Show configured providers and active model |
+| `/auth test [provider]` | Test provider authentication |
+| `/auth switch` | Switch provider and model |
+| `/auth remove [provider]` | Remove a provider credential |
+| `/auth logout` | Remove credentials and reset auth state |
+| `/model` | Browse and switch models |
+| `/doctor` | Diagnose Node, Git, config, auth, network, and project health |
 
 ### Plan And Understand
 
 | Command | Purpose |
 |---|---|
-| `ct init` | Create or register a project workspace |
-| `ct plan [goal]` | Stream roadmap and architecture generation |
-| `ct roadmap` | Generate phases and milestones |
-| `ct architect` | Generate architecture, data flow, and stack guidance |
-| `ct analyze [dir]` | Scan project structure and stream an AI summary |
-| `ct explain <file>` | Explain a file and its risks |
-| `ct summarize` | Summarize project health, blockers, and priorities |
+| `/init` | Create or register a project workspace |
+| `/plan [goal]` | Stream roadmap and architecture generation |
+| `/roadmap` | Generate phases and milestones |
+| `/architect` | Generate architecture, data flow, and stack guidance |
+| `/analyze [dir]` | Scan project structure and stream an AI summary |
+| `/explain <file>` | Explain a file and its risks |
+| `/summarize` | Summarize project health, blockers, and priorities |
 
 ### Build And Repair
 
 | Command | Purpose |
 |---|---|
-| `ct execute <goal>` | Run the autonomous agent loop on a concrete task |
-| `ct build [goal]` | Generate and apply code with build repair |
-| `ct autofix` | Run build/type checks and apply targeted fixes |
-| `ct debug` | Analyze build/runtime errors and stream fix guidance |
-| `ct run <cmd>` | Run a shell command through CodeThon policy gates |
-| `ct scaffold [dir]` | Generate a starter project |
+| `/execute <goal>` | Run the autonomous agent loop on a concrete task |
+| `/build [goal]` | Generate and apply code with build repair |
+| `/autofix` | Run build/type checks and apply targeted fixes |
+| `/debug` | Analyze build/runtime errors and stream fix guidance |
+| `/run <cmd>` | Run a shell command through CodeThon policy gates |
+| `/scaffold [dir]` | Generate a starter project |
 
 ### Inspect, Recover, Ship
 
 | Command | Purpose |
 |---|---|
-| `ct profile` | Find performance issues and code smells |
-| `ct review` | Inspect current git changes |
-| `ct diff` | Show the full git diff |
-| `ct checkpoint` | Save, list, and restore recovery points |
-| `ct recover` | Rebuild project context from local files |
-| `ct deploy` | Generate deployment guidance |
-| `ct readme` | Generate or refresh README.md |
-| `ct launch` | Generate demo script, submission copy, and launch assets |
-| `ct startup` | Analyze product and go-to-market potential |
-| `ct learn` | Ask a concept question and get a guided tutorial |
+| `/profile` | Find performance issues and code smells |
+| `/review` | Inspect current git changes |
+| `/diff` | Show the full git diff |
+| `/checkpoint` | Save, list, and restore recovery points |
+| `/recover` | Rebuild project context from local files |
+| `/deploy` | Generate deployment guidance |
+| `/readme` | Generate or refresh README.md |
+| `/launch` | Generate demo script, submission copy, and launch assets |
+| `/startup` | Analyze product and go-to-market potential |
+| `/learn` | Ask a concept question and get a guided tutorial |
 
 ## Safety Model
 
@@ -187,9 +179,10 @@ CodeThon is designed to be useful without being reckless.
 
 Examples:
 
-```bash
-ct --ask execute "add password reset"
-ct --dry-run execute "refactor billing components"
+```text
+/execute add password reset
+/debug
+/autofix
 ```
 
 ## Configuration
@@ -205,12 +198,12 @@ Typical locations:
 
 Use:
 
-```bash
-ct auth list
-ct auth test
-ct auth switch
-ct model
-ct doctor
+```text
+/auth list
+/auth test
+/auth switch
+/model
+/doctor
 ```
 
 ## Release Readiness
