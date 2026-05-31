@@ -6,6 +6,8 @@ import type { ToolCall, ToolResult } from './tools';
 import { searchWeb, crawlUrl } from '../utils/web-search';
 import { ProjectAnalyzer } from '../agents/project-analyzer';
 import { formatApiError } from '../utils/api-error';
+import { ExecutionLedger } from './execution-ledger';
+import type { ExecutionReceipt, ExecutionSnapshot } from './execution-ledger';
 import fs from 'fs';
 import path from 'path';
 
@@ -17,6 +19,8 @@ export interface JobStatus {
   error?: string;
   toolCall?: ToolCall;
   toolResult?: ToolResult;
+  receipt?: ExecutionReceipt;
+  evidence?: ExecutionSnapshot;
   elapsed?: number;
   totalElapsed?: number;
   iterElapsed?: number;
@@ -28,6 +32,7 @@ export interface JobResult {
   summary: string;
   errors: string[];
   elapsed: number;
+  receipt?: ExecutionReceipt;
 }
 
 const EXECUTOR_PROMPT = `You are CodeThon, an autonomous execution agent.
@@ -60,6 +65,9 @@ GUIDELINES:
 - NEVER create or modify .env files. Environment variables are already configured by the CLI.
 - NEVER write placeholder API keys like "your_api_key_here". If a project needs an API key, read it from process.env or import.meta.env.`;
 
+const PARALLEL_SAFE_TOOLS = new Set(['read_file', 'list_directory', 'search_files', 'grep_search', 'web_search', 'crawl_url']);
+const MAX_PARALLEL_TOOLS = 6;
+
 export class JobLoop {
   private provider: LLMProvider | null = null;
   private router: LLMRouter | null = null;
@@ -75,6 +83,8 @@ export class JobLoop {
   private useFallback: boolean;
   private providerInitError: string | null = null;
   private cancelReason: string | null = null;
+  private ledger: ExecutionLedger | null = null;
+  private injectedExecutionContext = '';
 
   constructor(projectRoot: string, maxIterations = 20, askMode = false, dryRun = false, useFallback = false) {
     this.useFallback = useFallback;
@@ -98,6 +108,10 @@ export class JobLoop {
         this.providerInitError = e.message || String(e);
       }
     }
+  }
+
+  setExecutionContext(context: string): void {
+    this.injectedExecutionContext = context.trim();
   }
 
   cancel(reason = 'Execution interrupted by user.'): void {
@@ -245,6 +259,16 @@ export class JobLoop {
     } catch { return null; }
   }
 
+  private deleteCheckpoint(): void {
+    if (!this.checkpointPath || !fs.existsSync(this.checkpointPath)) return;
+    try { fs.unlinkSync(this.checkpointPath); } catch { /* ignore */ }
+  }
+
+  private executionLedger(): ExecutionLedger {
+    if (!this.ledger) this.ledger = new ExecutionLedger(this.goal);
+    return this.ledger;
+  }
+
   async execute(
     goal: string,
     onStatus?: (status: JobStatus) => void,
@@ -255,6 +279,7 @@ export class JobLoop {
     this.startTime = Date.now();
     this.goal = goal;
     this.cancelReason = null;
+    this.ledger = new ExecutionLedger(goal);
 
     // Fail early if provider can't be initialized
     try {
@@ -266,7 +291,10 @@ export class JobLoop {
       return { success: false, iterations: 0, summary: msg, errors, elapsed: 0 };
     }
 
-    this.projectContext = await this.buildProjectContext();
+    this.projectContext = [
+      await this.buildProjectContext(),
+      this.injectedExecutionContext,
+    ].filter(Boolean).join('\n\n');
 
     const checkpointDir = path.join(this.executor.getProjectRoot(), '.codethon');
     this.checkpointPath = path.join(checkpointDir, 'execute-checkpoint.json');
@@ -304,6 +332,7 @@ export class JobLoop {
         phase: 'plan',
         description: `Iteration ${iteration + 1}/${this.maxIterations}`,
         done: false,
+        evidence: this.executionLedger().snapshot(),
         totalElapsed: Math.floor((iterStart - this.startTime) / 1000),
       });
 
@@ -346,35 +375,78 @@ export class JobLoop {
 
       if (/DONE:/i.test(content)) {
         const summary = content.replace(/.*DONE:\s*/is, '').trim();
+        const elapsed = Math.floor((Date.now() - this.startTime) / 1000);
+        const receipt = this.executionLedger().completeFromModel(summary, elapsed);
         onStatus?.({
           iteration,
           phase: 'done',
-          description: summary,
+          description: receipt.summary,
           done: true,
+          receipt,
+          evidence: receipt,
           elapsed: genElapsed,
-          totalElapsed: Math.floor((Date.now() - this.startTime) / 1000),
+          totalElapsed: elapsed,
         });
-        if (this.checkpointPath && fs.existsSync(this.checkpointPath)) {
-          try { fs.unlinkSync(this.checkpointPath); } catch { /* ignore */ }
-        }
-        return { success: true, iterations: iteration + 1, summary, errors, elapsed: Math.floor((Date.now() - this.startTime) / 1000) };
+        this.deleteCheckpoint();
+        return { success: true, iterations: iteration + 1, summary: receipt.summary, errors, elapsed, receipt };
       }
 
       const toolCalls = this.parseToolCalls(content);
 
       if (toolCalls.length > 0) {
-        for (const call of toolCalls) {
+        const results: ToolResult[] = [];
+
+        const executeOne = async (call: ToolCall): Promise<ToolResult> => {
+          if (this.cancelReason) {
+            const summary = this.cancelReason;
+            onStatus?.({
+              iteration,
+              phase: 'done',
+              description: summary,
+              done: true,
+              error: summary,
+              totalElapsed: Math.floor((Date.now() - this.startTime) / 1000),
+            });
+            throw new Error(summary);
+          }
+
           onStatus?.({
             iteration,
             phase: 'tool_call',
             description: call.tool,
             done: false,
             toolCall: call,
+            evidence: this.executionLedger().snapshot(),
           });
-        }
 
-        const results: ToolResult[] = [];
-        for (const call of toolCalls) {
+          const toolStart = Date.now();
+          let result: ToolResult;
+          if (call.tool === 'web_search') {
+            result = await this.executeWebSearch(call);
+          } else if (call.tool === 'crawl_url') {
+            result = await this.executeCrawl(call);
+          } else {
+            result = await this.executor.execute(call);
+          }
+          result.elapsed = Math.floor((Date.now() - toolStart) / 1000);
+          this.executionLedger().recordResult(result);
+
+          onStatus?.({
+            iteration,
+            phase: 'tool_result',
+            description: result.tool,
+            done: false,
+            toolResult: result,
+            evidence: this.executionLedger().snapshot(),
+            elapsed: result.elapsed,
+            totalElapsed: Math.floor((Date.now() - this.startTime) / 1000),
+            iterElapsed: Math.floor((Date.now() - iterStart) / 1000),
+          });
+
+          return result;
+        };
+
+        for (let idx = 0; idx < toolCalls.length;) {
           if (this.cancelReason) {
             const summary = this.cancelReason;
             onStatus?.({
@@ -388,28 +460,31 @@ export class JobLoop {
             return this.buildCancelledResult(iteration + 1, errors);
           }
 
-          const toolStart = Date.now();
-          let result: ToolResult;
-          if (call.tool === 'web_search') {
-            result = await this.executeWebSearch(call);
-          } else if (call.tool === 'crawl_url') {
-            result = await this.executeCrawl(call);
-          } else {
-            result = await this.executor.execute(call);
-          }
-          result.elapsed = Math.floor((Date.now() - toolStart) / 1000);
-          results.push(result);
+          const call = toolCalls[idx];
+          if (PARALLEL_SAFE_TOOLS.has(call.tool)) {
+            const batch: ToolCall[] = [];
+            while (
+              idx < toolCalls.length &&
+              PARALLEL_SAFE_TOOLS.has(toolCalls[idx].tool) &&
+              batch.length < MAX_PARALLEL_TOOLS
+            ) {
+              batch.push(toolCalls[idx]);
+              idx++;
+            }
 
-          onStatus?.({
-            iteration,
-            phase: 'tool_result',
-            description: result.tool,
-            done: false,
-            toolResult: result,
-            elapsed: result.elapsed,
-            totalElapsed: Math.floor((Date.now() - this.startTime) / 1000),
-            iterElapsed: Math.floor((Date.now() - iterStart) / 1000),
-          });
+            try {
+              const batchResults = await Promise.all(batch.map(executeOne));
+              results.push(...batchResults);
+            } catch {
+              if (this.cancelReason) {
+                return this.buildCancelledResult(iteration + 1, errors);
+              }
+            }
+          } else {
+            const result = await executeOne(call);
+            results.push(result);
+            idx++;
+          }
 
           if (this.cancelReason) {
             const summary = this.cancelReason;
@@ -438,9 +513,33 @@ export class JobLoop {
           });
         }
 
+        const elapsed = Math.floor((Date.now() - this.startTime) / 1000);
+        const receipt = this.executionLedger().evaluateCompletion(elapsed);
+        if (receipt) {
+          onStatus?.({
+            iteration,
+            phase: 'done',
+            description: receipt.summary,
+            done: true,
+            receipt,
+            evidence: receipt,
+            elapsed: Math.floor((Date.now() - iterStart) / 1000),
+            totalElapsed: elapsed,
+          });
+          this.deleteCheckpoint();
+          return {
+            success: true,
+            iterations: iteration + 1,
+            summary: receipt.summary,
+            errors,
+            elapsed,
+            receipt,
+          };
+        }
+
         this.conversation.push({
           role: 'user',
-          content: `Continue. (elapsed: ${genElapsed}s) Analyze results above. What next? If goal met, output DONE:.`,
+          content: `Continue. (elapsed: ${genElapsed}s)\n${this.executionLedger().evidencePrompt()}`,
         });
       } else {
         this.conversation.push({ role: 'assistant', content });

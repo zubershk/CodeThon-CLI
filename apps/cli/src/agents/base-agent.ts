@@ -20,7 +20,7 @@ function wrapProviderError(e: unknown): never {
     throw new BaseAgentError(friendlyAgentError(e), e);
   }
   throw new BaseAgentError(
-    `AI service error: ${e instanceof Error ? e.message : String(e)}\n\n  Run ct doctor to check system diagnostics.`,
+    `AI service error: ${e instanceof Error ? e.message : String(e)}\n\n  Run /doctor inside ct, or ct doctor from your shell to check system diagnostics.`,
     e,
   );
 }

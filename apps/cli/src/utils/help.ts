@@ -1,6 +1,7 @@
 import chalk from 'chalk';
 import { printActionHints, printHero } from './experience';
 import { COMMAND_CATEGORIES, formatCliUsage, formatSlashUsage } from './command-registry';
+import { CODETHON_VERSION } from './version';
 
 export function showCategorizedHelp(): void {
   printHero(
@@ -14,31 +15,33 @@ export function showCategorizedHelp(): void {
     { command: 'auth add', description: 'Connect a hosted provider or local model first.' },
     { command: 'init', description: 'Describe the project you want to build.' },
     { command: 'plan', description: 'Generate a roadmap and architecture before coding.' },
-    { command: 'execute "<goal>"', description: 'Let the agent work toward a concrete task.' },
+    { command: 'execute "<goal>"', description: 'Run the autonomous execution workspace.' },
   ]);
   console.log('');
 
   for (const cat of COMMAND_CATEGORIES) {
     const entries = cat.entries.filter(entry => !entry.replOnly);
     if (entries.length === 0) continue;
-    console.log(`  ${chalk.bold.hex('#A78BFA')(cat.title)}`);
-    console.log(`  ${chalk.dim(cat.description)}`);
+    console.log(`  ${chalk.hex('#dfff72').bold(cat.title)}`);
+    console.log(`  ${chalk.hex('#899691')(cat.description)}`);
     for (const entry of entries) {
       const usage = formatCliUsage(entry);
-      const cmd = chalk.cyanBright(usage);
+      const cmd = chalk.hex('#74d7ff')(usage);
       const padding = ' '.repeat(Math.max(1, 32 - usage.length));
-      console.log(`    ${cmd}${padding}${chalk.dim(entry.description)}`);
+      console.log(`    ${cmd}${padding}${chalk.hex('#899691')(entry.description)}`);
     }
     console.log('');
   }
 
-  console.log(`  ${chalk.dim('Flags:')}`);
-  console.log(`    ${chalk.yellowBright('-o, --output')}  ${chalk.dim('output format (text | json)')}`);
-  console.log(`    ${chalk.yellowBright('-a, --ask')}     ${chalk.dim('require approval for destructive operations')}`);
-  console.log(`    ${chalk.yellowBright('-n, --dry-run')} ${chalk.dim('show what would be done without making changes')}`);
-  console.log(`    ${chalk.yellowBright('--debug')}       ${chalk.dim('enable verbose debug output')}`);
+  console.log(`  ${chalk.hex('#899691')('Flags:')}`);
+  console.log(`    ${chalk.hex('#ffcf5c')('-o, --output')}  ${chalk.hex('#899691')('output format (text | json)')}`);
+  console.log(`    ${chalk.hex('#ffcf5c')('-a, --ask')}     ${chalk.hex('#899691')('require approval for destructive operations')}`);
+  console.log(`    ${chalk.hex('#ffcf5c')('-n, --dry-run')} ${chalk.hex('#899691')('show what would be done without making changes')}`);
+  console.log(`    ${chalk.hex('#ffcf5c')('--tui')}         ${chalk.hex('#899691')('use the terminal workspace when supported')}`);
+  console.log(`    ${chalk.hex('#ffcf5c')('--no-tui')}      ${chalk.hex('#899691')('force scrollback-safe line output')}`);
+  console.log(`    ${chalk.hex('#ffcf5c')('--debug')}       ${chalk.hex('#899691')('enable verbose debug output')}`);
   console.log('');
-  console.log(`  ${chalk.dim('Version:')} 1.0.0`);
+  console.log(`  ${chalk.hex('#899691')('Version:')} ${CODETHON_VERSION}`);
   console.log('');
 }
 
@@ -59,16 +62,16 @@ export function showCategorizedReplHelp(): void {
   console.log('');
 
   for (const cat of COMMAND_CATEGORIES) {
-    console.log(`  ${chalk.bold.hex('#A78BFA')(cat.title)}`);
-    console.log(`  ${chalk.dim(cat.description)}`);
+    console.log(`  ${chalk.hex('#dfff72').bold(cat.title)}`);
+    console.log(`  ${chalk.hex('#899691')(cat.description)}`);
     for (const entry of cat.entries) {
       const usage = formatSlashUsage(entry);
       const padding = ' '.repeat(Math.max(1, 26 - usage.length));
-      console.log(`    ${chalk.greenBright(usage)}${padding}${chalk.dim(entry.description)}`);
+      console.log(`    ${chalk.hex('#82f7a6')(usage)}${padding}${chalk.hex('#899691')(entry.description)}`);
     }
     console.log('');
   }
 
-  console.log(`  ${chalk.dim('Or just type any question to use the AI directly.')}`);
+  console.log(`  ${chalk.hex('#899691')('Or just type any question to use the AI directly.')}`);
   console.log('');
 }

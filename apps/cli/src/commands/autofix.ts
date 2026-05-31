@@ -9,13 +9,13 @@ export async function autofixCommand(askMode = false, dryRun = false): Promise<C
   const engine = new BuildEngine(process.cwd(), askMode, dryRun);
 
   try {
-    const spinner = createSpinner(chalk.yellowBright('Scanning for build errors...'));
+    const spinner = createSpinner(chalk.hex('#ffcf5c')('Scanning for build errors...'));
     spinner.start();
 
     const analysis = await engine.analyzeProject();
-    spinner.succeed(chalk.greenBright('Project analyzed'));
+    spinner.succeed(chalk.hex('#82f7a6')('Project analyzed'));
 
-    logger.info(`\n${chalk.cyanBright('\u25B8')} Running build checks on ${analysis.techStack.join(', ') || 'project'}...\n`);
+    logger.info(`\n${chalk.hex('#74d7ff')('\u25B8')} Running build checks on ${analysis.techStack.join(', ') || 'project'}...\n`);
 
     const fixResult = await engine.autoFix((token) => {
       process.stdout.write(token);
@@ -25,12 +25,12 @@ export async function autofixCommand(askMode = false, dryRun = false): Promise<C
 
     if (fixResult.filesFixed > 0) {
       logger.resultSummary('Auto-Fix Complete', [
-        `${chalk.greenBright('Files fixed')}: ${fixResult.filesFixed}`,
-        `${fixResult.errors.length > 0 ? chalk.redBright('Errors during fix') : chalk.greenBright('Errors')}: ${fixResult.errors.length}`,
+        `${chalk.hex('#82f7a6')('Files fixed')}: ${fixResult.filesFixed}`,
+        `${fixResult.errors.length > 0 ? chalk.hex('#ff5c7a')('Errors during fix') : chalk.hex('#82f7a6')('Errors')}: ${fixResult.errors.length}`,
       ]);
     } else {
       logger.resultSummary('Auto-Fix Complete', [
-        `${chalk.greenBright('No issues found')}`,
+        `${chalk.hex('#82f7a6')('No issues found')}`,
       ]);
     }
 

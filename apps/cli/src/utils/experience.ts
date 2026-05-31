@@ -1,5 +1,6 @@
 import chalk from 'chalk';
 import type { ProjectState } from '@codethon/shared-types';
+import { stripAnsi, truncateText } from '../ui/terminal-text';
 import type { LLMConfig } from './config';
 import { getProviderDisplayName } from './provider-catalog';
 
@@ -8,36 +9,63 @@ export interface ActionHint {
   description: string;
 }
 
-function divider(width = Math.max(62, Math.min(110, (process.stdout.columns || 88) - 4))): string {
-  return chalk.dim('─'.repeat(width));
+const oled = {
+  cyan: chalk.hex('#74d7ff'),
+  lime: chalk.hex('#dfff72'),
+  green: chalk.hex('#82f7a6'),
+  amber: chalk.hex('#ffcf5c'),
+  violet: chalk.hex('#d7a3ff'),
+  dim: chalk.hex('#899691'),
+  text: chalk.hex('#e0e6e1'),
+  bright: chalk.hex('#f7fff9'),
+  border: chalk.hex('#31413b'),
+};
+
+function terminalWidth(max = 110): number {
+  return Math.max(62, Math.min(max, (process.stdout.columns || 88) - 4));
+}
+
+function divider(width = terminalWidth()): string {
+  return oled.border('─'.repeat(width));
+}
+
+function padAnsi(value: string, width: number): string {
+  return value + ' '.repeat(Math.max(0, width - stripAnsi(value).length));
 }
 
 function statusColor(status: 'ready' | 'setup' | 'warning'): (text: string) => string {
-  if (status === 'ready') return chalk.greenBright;
-  if (status === 'warning') return chalk.yellowBright;
-  return chalk.magentaBright;
+  if (status === 'ready') return oled.green;
+  if (status === 'warning') return oled.amber;
+  return oled.violet;
 }
 
 export function printHero(title: string, subtitle: string, status: 'ready' | 'setup' | 'warning', badge: string): void {
+  const width = terminalWidth(112);
+  const inner = width - 4;
   const paint = statusColor(status);
+  const titleLine = `${paint('*')} ${oled.bright.bold(title)}  ${oled.dim('·')} ${paint(badge)}  ${oled.dim('OLED DARK')}`;
+  const subtitleLine = oled.text(truncateText(subtitle, inner));
   console.log('');
-  console.log(`  ${paint('◆')} ${chalk.bold.whiteBright(title)}  ${chalk.dim('·')} ${paint(badge)}`);
-  console.log(`  ${chalk.dim(subtitle)}`);
-  console.log(`  ${divider()}`);
+  console.log(`  ${oled.cyan(`╭${'─'.repeat(width - 2)}╮`)}`);
+  console.log(`  ${oled.cyan('│')} ${padAnsi(titleLine, inner)} ${oled.cyan('│')}`);
+  console.log(`  ${oled.cyan('├')}${divider(width - 2)}${oled.cyan('┤')}`);
+  console.log(`  ${oled.cyan('│')} ${padAnsi(subtitleLine, inner)} ${oled.cyan('│')}`);
+  console.log(`  ${oled.cyan(`╰${'─'.repeat(width - 2)}╯`)}`);
 }
 
 export function printFacts(rows: Array<{ label: string; value: string }>): void {
   for (const row of rows) {
-    console.log(`  ${chalk.bold.cyanBright(row.label)}: ${chalk.whiteBright(row.value)}`);
+    console.log(`  ${oled.cyan.bold(row.label.padEnd(12))} ${oled.bright(row.value)}`);
   }
 }
 
 export function printActionHints(title: string, hints: ActionHint[], prefix = 'ct'): void {
   if (hints.length === 0) return;
   console.log('');
-  console.log(`  ${chalk.bold.whiteBright(title)}`);
+  console.log(`  ${oled.lime.bold(title)}`);
   for (const hint of hints) {
-    console.log(`  ${chalk.cyanBright(prefix === '/' ? `${prefix}${hint.command}` : `${prefix} ${hint.command}`)}  ${chalk.dim(hint.description)}`);
+    const command = prefix === '/' ? `${prefix}${hint.command}` : `${prefix} ${hint.command}`;
+    console.log(`  ${oled.cyan(command.padEnd(22))} ${oled.dim(hint.description)}`);
   }
 }
 

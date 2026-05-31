@@ -25,7 +25,7 @@ export class ContextBuilder {
     parts.push('');
 
     if (!project) {
-      parts.push('No active project. The user needs to run `ct init` first.');
+      parts.push('No active project. The user needs to run `/init` inside ct, or `ct init` from the shell first.');
       if (userInput) {
         parts.push('');
         parts.push('## User Input');
@@ -56,9 +56,9 @@ export class ContextBuilder {
       const pressureLevel = sprintInfo.pressure;
       const skill = project.experienceLevel;
       if (pressureLevel === 'critical') {
-        parts.push('⚠ CRITICAL: Very little time remaining. Prioritize only what is essential for the demo.');
+        parts.push('▲ CRITICAL: Very little time remaining. Prioritize only what is essential for the demo.');
       } else if (pressureLevel === 'high' && skill === 'beginner') {
-        parts.push('⚠ Limited time. Suggest the simplest possible solution.');
+        parts.push('▲ Limited time. Suggest the simplest possible solution.');
       }
       parts.push('');
     }
@@ -70,7 +70,7 @@ export class ContextBuilder {
       const total = project.roadmap.milestones.length;
       parts.push(`Progress: ${done}/${total} milestones complete`);
       project.roadmap.milestones.forEach((m) => {
-        parts.push(`  ${m.status === 'done' ? '✓' : m.status === 'in_progress' ? '→' : '○'} ${m.title} (${m.priority})`);
+        parts.push(`  ${m.status === 'done' ? '[done]' : m.status === 'in_progress' ? '[active]' : '[todo]'} ${m.title} (${m.priority})`);
       });
       parts.push('');
     }
@@ -122,7 +122,7 @@ export class ContextBuilder {
     if (suggestion.nextSuggestedCommands.length > 0) {
       parts.push('## Suggested Next Steps');
       suggestion.nextSuggestedCommands.forEach((cmd) => {
-        parts.push(`  → ct ${cmd}`);
+        parts.push(`  -> ct ${cmd}`);
       });
       parts.push(`Rationale: ${suggestion.rationale}`);
       parts.push('');

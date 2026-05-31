@@ -20,7 +20,7 @@ export async function naturalLanguageCommand(input: string) {
   const project = state.getProject();
   const context = project
     ? `Current project: "${project.idea}"\nStack: ${project.stack}\nTimeline: ${project.timeline}\nPhase: ${project.sprintPhase}`
-    : 'No active project. Run `ct init` to start one.';
+    : 'No active project. Run `/init` inside ct, or `ct init` from your shell to start one.';
 
   // Gather web intelligence
   const urls = extractUrls(input);

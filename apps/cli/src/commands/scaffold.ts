@@ -15,7 +15,7 @@ export async function scaffoldCommand(targetDir?: string, templateNameArg?: stri
   const state = new StateManager();
   const project = state.getProject();
   if (!project) {
-    logger.error('No active project. Run `ct init` first.');
+    logger.error('No active project. Run `/init` inside ct, or `ct init` from your shell.');
     return { success: false, message: 'No active project' };
   }
 

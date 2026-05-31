@@ -19,34 +19,19 @@ export interface ThemeColors {
   accent: RGB;
 }
 
-const DARK_THEME: ThemeColors = {
-  primary: { r: 0, g: 180, b: 255 },
-  secondary: { r: 140, g: 80, b: 255 },
-  success: { r: 0, g: 200, b: 120 },
-  warning: { r: 255, g: 180, b: 0 },
-  error: { r: 255, g: 60, b: 60 },
-  info: { r: 100, g: 180, b: 255 },
-  text: { r: 220, g: 220, b: 220 },
-  textDim: { r: 140, g: 140, b: 140 },
+const OLED_DARK_THEME: ThemeColors = {
+  primary: { r: 116, g: 215, b: 255 },
+  secondary: { r: 223, g: 255, b: 114 },
+  success: { r: 130, g: 247, b: 166 },
+  warning: { r: 255, g: 207, b: 92 },
+  error: { r: 255, g: 92, b: 122 },
+  info: { r: 116, g: 215, b: 255 },
+  text: { r: 224, g: 230, b: 225 },
+  textDim: { r: 137, g: 150, b: 145 },
   textBright: { r: 255, g: 255, b: 255 },
-  background: { r: 18, g: 18, b: 22 },
-  border: { r: 60, g: 60, b: 70 },
-  accent: { r: 255, g: 100, b: 200 },
-};
-
-const LIGHT_THEME: ThemeColors = {
-  primary: { r: 0, g: 100, b: 200 },
-  secondary: { r: 100, g: 50, b: 200 },
-  success: { r: 0, g: 150, b: 80 },
-  warning: { r: 200, g: 140, b: 0 },
-  error: { r: 200, g: 40, b: 40 },
-  info: { r: 50, g: 130, b: 200 },
-  text: { r: 30, g: 30, b: 35 },
-  textDim: { r: 120, g: 120, b: 125 },
-  textBright: { r: 0, g: 0, b: 0 },
-  background: { r: 248, g: 248, b: 250 },
-  border: { r: 200, g: 200, b: 205 },
-  accent: { r: 200, g: 50, b: 150 },
+  background: { r: 0, g: 0, b: 0 },
+  border: { r: 58, g: 68, b: 64 },
+  accent: { r: 223, g: 255, b: 114 },
 };
 
 export class Theme {
@@ -54,8 +39,8 @@ export class Theme {
   private mode: 'dark' | 'light';
 
   constructor(mode: 'dark' | 'light' = 'dark') {
-    this.mode = mode;
-    this.current = mode === 'dark' ? { ...DARK_THEME } : { ...LIGHT_THEME };
+    this.mode = 'dark';
+    this.current = { ...OLED_DARK_THEME };
   }
 
   get colors(): ThemeColors {
@@ -67,12 +52,13 @@ export class Theme {
   }
 
   setMode(mode: 'dark' | 'light'): void {
-    this.mode = mode;
-    this.current = mode === 'dark' ? { ...DARK_THEME } : { ...LIGHT_THEME };
+    void mode;
+    this.mode = 'dark';
+    this.current = { ...OLED_DARK_THEME };
   }
 
   toggle(): void {
-    this.setMode(this.mode === 'dark' ? 'light' : 'dark');
+    this.setMode('dark');
   }
 
   rgb(color: RGB): string {

@@ -49,7 +49,7 @@ const commandGroups = [
   {
     title: "Build And Repair",
     commands: [
-      ["/execute <goal>", "Run the autonomous agent loop on a concrete task."],
+      ["/execute <goal>", "Run the autonomous OLED workspace with mission feed, trace, context, diff, and receipt."],
       ["/build [goal]", "Generate and apply code with build-error repair."],
       ["/autofix", "Run build/type checks and apply targeted fixes."],
       ["/debug", "Analyze errors and stream fix guidance."],
@@ -65,6 +65,11 @@ const commandGroups = [
       ["/diff", "Show the full git diff."],
       ["/checkpoint", "Save, list, and restore recovery points."],
       ["/recover", "Rebuild project context from local files."],
+      ["/inspect [runId]", "Inspect a saved execution journal."],
+      ["/replay [runId]", "Replay a run's event timeline."],
+      ["/memory [query]", "Explore persistent project memory."],
+      ["/analytics", "Show execution reliability and productivity metrics."],
+      ["/graph [dir]", "Visualize repository structure and dependency signals."],
       ["/deploy", "Generate deployment guidance."],
       ["/readme", "Generate or refresh README.md."],
       ["/launch", "Generate demo script, submission copy, and launch assets."],
@@ -91,9 +96,11 @@ const slashCommands = [
   ["/help", "Show categorized help inside the REPL."],
   ["/init", "Create or register the active project workspace."],
   ["/plan", "Stream roadmap and architecture output."],
-  ["/execute <goal>", "Run the autonomous execution agent."],
+  ["/execute <goal>", "Run the autonomous execution workspace."],
   ["/analyze", "Show analysis stages and stream the project summary."],
   ["/profile", "Run static performance and maintainability profiling."],
+  ["/inspect", "Inspect the latest execution journal."],
+  ["/replay", "Replay the latest event timeline."],
 ];
 
 const safetyItems = [
@@ -103,6 +110,29 @@ const safetyItems = [
   "Child-process environments are filtered for common secret names.",
   "Provider credentials are stored outside project files.",
   "Recovery checkpoints can save, list, and restore project snapshots.",
+];
+
+const executionControls = [
+  ["Ctrl+M", "Open Mission Control: goal, progress, active agent, current file, and checkpoints."],
+  ["Ctrl+T", "Open the live activity trace with tool calls, commands, results, and durations."],
+  ["Ctrl+I", "Open Context Inspector to see files, memory entries, and context usage."],
+  ["Ctrl+D", "Open Diff Inspector for files touched during the run."],
+  ["Ctrl+A", "Open the agent matrix for Planner, Scout, Research, Builder, and Verifier status."],
+  ["Esc", "Close the active drawer. If no drawer is open, cancel the active execution and return to the REPL."],
+  ["Ctrl+C", "Cancel the active execution gracefully. A second deliberate press force-quits only if the command is stuck."],
+];
+
+const docsNavItems = [
+  ["Quick start", "#quick-start"],
+  ["Onboarding", "#onboarding"],
+  ["Interactive REPL", "#repl"],
+  ["Commands", "#commands"],
+  ["Providers", "#providers"],
+  ["Execution", "#execution"],
+  ["Analysis", "#analysis"],
+  ["Safety", "#safety"],
+  ["Configuration", "#configuration"],
+  ["Publishing", "#publishing"],
 ];
 
 function Section({
@@ -127,14 +157,14 @@ function Section({
 
 export default function DocsPage() {
   return (
-    <main className="min-h-screen bg-black text-white">
+    <main className="min-h-screen overflow-x-hidden bg-black text-white">
       <header className="border-b border-white/10 bg-black/82 backdrop-blur-xl">
-        <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between px-5 lg:px-8">
-          <Link href="/" className="flex items-center gap-2 font-semibold">
+        <nav className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between gap-3 px-4 sm:px-5 lg:px-8">
+          <Link href="/" className="flex min-w-0 items-center gap-2 font-semibold">
             <span className="brand-mark">
               <Terminal className="h-4 w-4" />
             </span>
-            <span>CodeThon CLI Docs</span>
+            <span className="truncate">CodeThon CLI Docs</span>
           </Link>
           <Link href="/" className="icon-link">
             <ArrowLeft className="h-4 w-4" />
@@ -143,21 +173,25 @@ export default function DocsPage() {
         </nav>
       </header>
 
-      <section className="hero-oled px-5 py-16 lg:px-8">
-        <div className="mx-auto max-w-7xl">
+      <section className="hero-oled relative overflow-hidden px-5 py-16 lg:px-8">
+        <div className="scanline" />
+        <div className="docs-hero-inner relative z-10 mx-auto min-w-0">
           <p className="eyebrow-pill">
             <FileText className="h-3.5 w-3.5" />
             Complete builder documentation
           </p>
-          <h1 className="mt-6 max-w-5xl text-balance text-5xl font-semibold leading-[1] tracking-normal sm:text-6xl lg:text-7xl">
-            Build with CodeThon CLI from first setup to shipped project.
+          <h1 className="mt-6 max-w-5xl text-4xl font-semibold leading-[1.03] tracking-normal sm:text-6xl lg:text-7xl">
+            <span className="docs-title-line">Build with</span>{" "}
+            <span className="docs-title-line">CodeThon CLI</span>{" "}
+            <span className="docs-title-line">from first setup</span>{" "}
+            <span className="docs-title-line">to shipped project.</span>
           </h1>
           <p className="mt-7 max-w-3xl text-lg leading-8 text-white/66">
             This guide covers installation, provider setup, slash-command navigation,
             project initialization, planning, autonomous execution, analysis, profiling,
             recovery, security controls, and release checks.
           </p>
-          <div className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="docs-stat-grid mt-8 grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {[
               ["Install", "npm install -g codethon-cli"],
               ["Start", "ct"],
@@ -173,23 +207,21 @@ export default function DocsPage() {
         </div>
       </section>
 
-      <div className="mx-auto grid max-w-7xl gap-10 px-5 py-16 lg:grid-cols-[260px_1fr] lg:px-8">
+      <div className="mx-auto grid w-full max-w-7xl min-w-0 grid-cols-1 gap-8 px-4 py-12 sm:px-5 sm:py-16 lg:grid-cols-[260px_minmax(0,1fr)] lg:gap-10 lg:px-8">
+        <div className="docs-mobile-nav lg:hidden">
+          <Link href="/">Home</Link>
+          {docsNavItems.map(([label, href]) => (
+            <a key={href} href={href}>
+              {label}
+            </a>
+          ))}
+        </div>
+
         <aside className="hidden lg:block">
           <div className="sticky top-24 rounded-lg border border-white/10 bg-white/[0.035] p-4">
             <p className="mb-3 text-sm font-semibold text-white">On this page</p>
             <div className="grid gap-2 text-sm text-white/58">
-              {[
-                ["Quick start", "#quick-start"],
-                ["Onboarding", "#onboarding"],
-                ["Interactive REPL", "#repl"],
-                ["Commands", "#commands"],
-                ["Providers", "#providers"],
-                ["Execution", "#execution"],
-                ["Analysis", "#analysis"],
-                ["Safety", "#safety"],
-                ["Configuration", "#configuration"],
-                ["Publishing", "#publishing"],
-              ].map(([label, href]) => (
+              {docsNavItems.map(([label, href]) => (
                 <a key={href} href={href} className="transition hover:text-white">
                   {label}
                 </a>
@@ -198,7 +230,7 @@ export default function DocsPage() {
           </div>
         </aside>
 
-        <div className="space-y-8">
+        <div className="min-w-0 space-y-8">
           <Section id="quick-start" eyebrow="Quick Start" title="Install and open the builder workspace.">
             <p>
               CodeThon is distributed as the `codethon-cli` npm package. Install it
@@ -275,13 +307,32 @@ ct`}</code></pre>
 
           <Section id="execution" eyebrow="Execution Loop" title="Give the agent a concrete task.">
             <p>
-              `/execute` runs an autonomous loop with planning, file reading, file
-              editing, search, grep/list, web/crawl support, command execution, and
-              repair cycles. Good goals are specific and bounded.
+              `/execute` runs the autonomous OLED workspace with a mission feed,
+              mission-info panel, live activity stream, context inspector, diff
+              inspector, agent matrix, execution journal, checkpoints, and final
+              completion receipt.
             </p>
             <pre><code>{`/execute implement the pricing page and add tests
+/inspect
+/replay
 /debug
 /autofix`}</code></pre>
+            <article className="docs-card mt-5">
+              <h3>Workspace controls</h3>
+              <p>
+                The workspace keeps the run on screen while drawers open over the
+                current session. The footer now uses direct labels only:
+                `Ctrl+M Mission` and `Ctrl+I Context`.
+              </p>
+              <div className="mt-4 grid gap-3">
+                {executionControls.map(([shortcut, description]) => (
+                  <div key={shortcut} className="docs-row">
+                    <code>{shortcut}</code>
+                    <span>{description}</span>
+                  </div>
+                ))}
+              </div>
+            </article>
           </Section>
 
           <Section id="analysis" eyebrow="Analysis And Profiling" title="Understand what the agent sees.">

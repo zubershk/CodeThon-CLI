@@ -32,7 +32,6 @@ export const COMMAND_CATEGORIES: CommandCategory[] = [
     title: 'Start',
     description: 'Get a workspace ready and choose what CodeThon should do next.',
     entries: [
-      { name: 'auth', usage: 'auth add', slash: '/auth add', description: 'Connect or manage an AI provider.', category: 'Start' },
       { name: 'init', usage: 'init', slash: '/init', description: 'Create or register a project workspace.', category: 'Start' },
       { name: 'status', usage: 'status', slash: '/status', description: 'Show project, model, health, and next actions.', category: 'Start' },
       { name: 'doctor', usage: 'doctor', slash: '/doctor', description: 'Check Node, Git, config, auth, network, and local health.', category: 'Start' },
@@ -67,7 +66,7 @@ export const COMMAND_CATEGORIES: CommandCategory[] = [
     title: 'Build',
     description: 'Make changes, run tools, test, debug, and recover.',
     entries: [
-      { name: 'execute', usage: 'execute <goal>', slash: '/execute <goal>', description: 'Run the autonomous agent on a concrete task.', category: 'Build', requiresAI: true, requiresArg: true },
+      { name: 'execute', usage: 'execute <goal>', slash: '/execute <goal>', description: 'Run the autonomous execution workspace with live trace, context, checkpoints, and receipt.', category: 'Build', requiresAI: true, requiresArg: true, aliases: ['auto'] },
       { name: 'build', usage: 'build [goal]', slash: '/build [goal]', description: 'Generate and apply code with build-error repair.', category: 'Build', requiresAI: true },
       { name: 'debug', usage: 'debug', slash: '/debug', description: 'Collect errors and ask the AI for targeted fixes.', category: 'Build', requiresAI: true },
       { name: 'autofix', usage: 'autofix', slash: '/autofix', description: 'Run build checks and apply focused fixes.', category: 'Build', requiresAI: true },
@@ -85,8 +84,14 @@ export const COMMAND_CATEGORIES: CommandCategory[] = [
       { name: 'explain', usage: 'explain <file>', slash: '/explain <file>', description: 'Explain a file and its role in the project.', category: 'Inspect', requiresAI: true, requiresArg: true },
       { name: 'summarize', usage: 'summarize', slash: '/summarize', description: 'Summarize project health, blockers, and priorities.', category: 'Inspect', requiresAI: true },
       { name: 'profile', usage: 'profile', slash: '/profile', description: 'Find performance issues and code smells.', category: 'Inspect' },
+      { name: 'memory', usage: 'memory [query]', slash: '/memory [query]', description: 'Explore persistent project memory.', category: 'Inspect' },
+      { name: 'analytics', usage: 'analytics', slash: '/analytics', description: 'Show execution reliability and productivity metrics.', category: 'Inspect' },
+      { name: 'graph', usage: 'graph [dir]', slash: '/graph [dir]', description: 'Visualize repository architecture and dependencies.', category: 'Inspect' },
       { name: 'git', usage: 'git', slash: '/git', description: 'Git status, diff, branch, review, and PR helpers.', category: 'Inspect' },
       { name: 'test', usage: 'test', slash: '/test', description: 'Generate tests, inspect coverage, and run test workflows.', category: 'Inspect' },
+      { name: 'sessions', usage: 'sessions', slash: '/sessions', description: 'Open the execution session dashboard.', category: 'Inspect' },
+      { name: 'inspect', usage: 'inspect [runId]', slash: '/inspect [runId]', description: 'Inspect a persisted execution journal.', category: 'Inspect' },
+      { name: 'replay', usage: 'replay [runId]', slash: '/replay [runId]', description: 'Replay an execution event timeline.', category: 'Inspect' },
     ],
   },
   {

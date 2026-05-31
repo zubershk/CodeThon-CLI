@@ -18,12 +18,12 @@ export async function reviewCommand(): Promise<CommandResult> {
   const result = await runtime.execute('git diff --stat', 10000);
 
   if (result.success && result.stdout) {
-    logger.info(chalk.greenBright('Modified files:'));
+    logger.info(chalk.hex('#82f7a6')('Modified files:'));
     logger.info(result.stdout);
     logger.info('');
-    logger.info(chalk.dim('Run `ct diff` for full diff'));
+    logger.info(chalk.hex('#899691')('Run `ct diff` for full diff'));
   } else {
-    logger.info(chalk.yellowBright('No changes detected'));
+    logger.info(chalk.hex('#ffcf5c')('No changes detected'));
   }
 
   return { success: true, message: 'Review complete' };

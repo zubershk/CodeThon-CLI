@@ -68,7 +68,7 @@ export function parseNpmErrors(output: string): string[] {
 export function formatParsedErrors(errors: ParsedError[]): string {
   if (errors.length === 0) return '';
   return errors.map(e =>
-    `  ${e.severity === 'error' ? chalk.redBright('\u2717') : chalk.yellowBright('\u26A0')} ${chalk.cyan(`${e.file}:${e.line}:${e.col}`)}  ${chalk.whiteBright(e.message)}`
+    `  ${e.severity === 'error' ? chalk.hex('#ff5c7a')('\u2717') : chalk.hex('#ffcf5c')('\u26A0')} ${chalk.hex('#74d7ff')(`${e.file}:${e.line}:${e.col}`)}  ${chalk.hex('#f7fff9')(e.message)}`
   ).join('\n');
 }
 
@@ -95,9 +95,9 @@ export function generateFixSuggestions(errors: ParsedError[]): string[] {
   }
 
   if (errors.length <= 3) {
-    suggestions.push(`ct build "fix ${errors[0].message.slice(0, 60)}"`);
+    suggestions.push(`/build "fix ${errors[0].message.slice(0, 60)}"`);
   } else {
-    suggestions.push(`ct autofix  (auto-fix ${errors.length} build errors)`);
+    suggestions.push(`/autofix  (auto-fix ${errors.length} build errors)`);
   }
 
   return suggestions;

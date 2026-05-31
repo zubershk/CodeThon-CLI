@@ -136,18 +136,61 @@ export class ToolExecutor {
 
   getProjectRoot(): string { return this.projectRoot; }
 
+  private stringArg(call: ToolCall, keys: string[], arrayKeys: string[] = []): string | null {
+    const args = call.args || {};
+    for (const key of keys) {
+      const value = args[key];
+      if (typeof value === 'string' && value.trim()) {
+        return value.trim();
+      }
+    }
+
+    for (const key of arrayKeys) {
+      const value = args[key];
+      if (!Array.isArray(value)) continue;
+      const found = value.find((item): item is string => typeof item === 'string' && item.trim().length > 0);
+      if (found) return found.trim();
+    }
+
+    return null;
+  }
+
+  private numberArg(call: ToolCall, key: string, fallback: number): number {
+    const value = call.args?.[key];
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+    if (typeof value === 'string' && value.trim() && Number.isFinite(Number(value))) {
+      return Number(value);
+    }
+    return fallback;
+  }
+
+  private missingArg(call: ToolCall, arg: string, example: string): ToolResult {
+    return {
+      id: call.id,
+      tool: call.tool,
+      output: '',
+      error: `${call.tool} needs a ${arg}. Example: ${example}`,
+    };
+  }
+
   private resolvePath(relativePath: string): string {
     const resolved = path.resolve(this.projectRoot, relativePath);
-    if (!resolved.startsWith(this.projectRoot)) {
+    const relative = path.relative(this.projectRoot, resolved);
+    if (relative.startsWith('..') || path.isAbsolute(relative)) {
       throw new Error(`Path "${relativePath}" escapes project root`);
     }
     return resolved;
   }
 
   private async readFile(call: ToolCall): Promise<ToolResult> {
-    const filePath = this.resolvePath(call.args.path);
+    const requestedPath = this.stringArg(call, ['path', 'file', 'filePath', 'filename', 'target'], ['paths', 'files']);
+    if (!requestedPath) {
+      return this.missingArg(call, 'file path', '{"path":"src/index.ts"}');
+    }
+
+    const filePath = this.resolvePath(requestedPath);
     if (!fs.existsSync(filePath)) {
-      return { id: call.id, tool: call.tool, output: '', error: `File not found: ${call.args.path}` };
+      return { id: call.id, tool: call.tool, output: '', error: `File not found: ${requestedPath}` };
     }
     const stat = fs.statSync(filePath);
     if (stat.size > MAX_FILE_SIZE) {
@@ -155,27 +198,35 @@ export class ToolExecutor {
     }
     const content = fs.readFileSync(filePath, 'utf-8');
     const lines = content.split('\n');
-    const maxLines = call.args.maxLines || 200;
+    const maxLines = this.numberArg(call, 'maxLines', 200);
     const truncated = lines.length > maxLines;
     const display = lines.slice(0, maxLines).map((l, i) => `${(i + 1).toString().padStart(4, ' ')}| ${l}`).join('\n');
     const note = truncated ? `\n... (${lines.length - maxLines} more lines, file has ${lines.length} total)` : '';
-    return { id: call.id, tool: call.tool, output: `${call.args.path} (${lines.length} lines)\n${display}${note}` };
+    return { id: call.id, tool: call.tool, output: `${requestedPath} (${lines.length} lines)\n${display}${note}` };
   }
 
   private async writeFile(call: ToolCall): Promise<ToolResult> {
-    const filePath = this.resolvePath(call.args.path);
+    const requestedPath = this.stringArg(call, ['path', 'file', 'filePath', 'filename', 'target'], ['paths', 'files']);
+    if (!requestedPath) {
+      return this.missingArg(call, 'target file path', '{"path":"src/index.ts","content":"..."}');
+    }
+    if (typeof call.args?.content !== 'string') {
+      return this.missingArg(call, 'file content string', '{"path":"src/index.ts","content":"..."}');
+    }
+
+    const filePath = this.resolvePath(requestedPath);
     const dir = path.dirname(filePath);
 
     if (this.dryRun) {
       const existing = fs.existsSync(filePath) ? ' (overwrite)' : '';
-      return { id: call.id, tool: call.tool, output: `[DRY RUN] Would write ${call.args.path} (${call.args.content?.length ?? 0} bytes)${existing}` };
+      return { id: call.id, tool: call.tool, output: `[DRY RUN] Would write ${requestedPath} (${call.args.content.length} bytes)${existing}` };
     }
 
     if (this.askMode) {
       const existing = fs.existsSync(filePath);
       const approved = await requireApproval({
         type: existing ? 'modify_file' : 'write_file',
-        description: existing ? `Modify: ${call.args.path}` : `Create: ${call.args.path}`,
+        description: existing ? `Modify: ${requestedPath}` : `Create: ${requestedPath}`,
         details: `Path: ${filePath}\nSize: ~${(call.args.content?.length ?? 0)} bytes`,
         risk: existing ? (call.args.content?.length > 10000 ? 'high' : 'medium') : 'low',
       });
@@ -200,12 +251,15 @@ export class ToolExecutor {
       this.fileHistory.set(filePath, fs.readFileSync(filePath, 'utf-8'));
     }
     fs.writeFileSync(filePath, call.args.content, 'utf-8');
-    return { id: call.id, tool: call.tool, output: `Wrote ${call.args.path} (${call.args.content.length} bytes)` };
+    return { id: call.id, tool: call.tool, output: `Wrote ${requestedPath} (${call.args.content.length} bytes)` };
   }
 
   private async searchFiles(call: ToolCall): Promise<ToolResult> {
-    const pattern = call.args.pattern;
-    const maxResults = call.args.maxResults || 30;
+    const pattern = this.stringArg(call, ['pattern', 'glob', 'query']);
+    if (!pattern) {
+      return this.missingArg(call, 'file search pattern', '{"pattern":"src/**/*.ts"}');
+    }
+    const maxResults = this.numberArg(call, 'maxResults', 30);
     const files: string[] = [];
     const maxDepth = 5;
 
@@ -250,9 +304,12 @@ export class ToolExecutor {
   }
 
   private async grepSearch(call: ToolCall): Promise<ToolResult> {
-    const pattern = call.args.pattern;
-    const maxResults = call.args.maxResults || 30;
-    const include = call.args.include || '*';
+    const pattern = this.stringArg(call, ['pattern', 'query', 'text']);
+    if (!pattern) {
+      return this.missingArg(call, 'search pattern', '{"pattern":"TODO","include":"*.ts"}');
+    }
+    const maxResults = this.numberArg(call, 'maxResults', 30);
+    const include = this.stringArg(call, ['include', 'glob', 'files']) || '*';
 
     // Try ripgrep first
     let results = '';
@@ -315,11 +372,12 @@ export class ToolExecutor {
   }
 
   private async listDir(call: ToolCall): Promise<ToolResult> {
-    const dirPath = this.resolvePath(call.args.path || '.');
+    const requestedPath = this.stringArg(call, ['path', 'dir', 'directory', 'target'], ['paths']) || '.';
+    const dirPath = this.resolvePath(requestedPath);
     if (!fs.existsSync(dirPath)) {
-      return { id: call.id, tool: call.tool, output: '', error: `Directory not found: ${call.args.path || '.'}` };
+      return { id: call.id, tool: call.tool, output: '', error: `Directory not found: ${requestedPath}` };
     }
-    const depth = Math.min(call.args.depth || 2, 3);
+    const depth = Math.min(this.numberArg(call, 'depth', 2), 3);
     const lines: string[] = [];
     function walk(dir: string, prefix = ''): void {
       let entries: fs.Dirent[];
@@ -342,7 +400,10 @@ export class ToolExecutor {
   }
 
   private async runCommand(call: ToolCall): Promise<ToolResult> {
-    const cmd = call.args.command;
+    const cmd = this.stringArg(call, ['command', 'cmd']);
+    if (!cmd) {
+      return this.missingArg(call, 'command string', '{"command":"npm run build"}');
+    }
     const parts = cmd.split(/\s+/);
     const first = parts[0];
     if (!isAllowedBinary(first)) {

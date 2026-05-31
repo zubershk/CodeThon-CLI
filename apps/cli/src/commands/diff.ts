@@ -1,40 +1,48 @@
 import chalk from 'chalk';
 import type { CommandResult } from '@codethon/shared-types';
-import { StateManager } from '../cil/state-manager';
 import { getRuntime } from '../runtime';
 import { logger } from '../utils';
+import { renderDiffViewer } from '../ui/supernova';
+import type { DiffFileSummary } from '../ui/supernova';
+
+function parseNumstat(output: string): DiffFileSummary[] {
+  return output.split(/\r?\n/)
+    .map(line => line.trim())
+    .filter(Boolean)
+    .map(line => {
+      const [addedRaw, removedRaw, ...pathParts] = line.split(/\s+/);
+      return {
+        path: pathParts.join(' '),
+        status: 'M',
+        added: Number(addedRaw) || 0,
+        removed: Number(removedRaw) || 0,
+      };
+    });
+}
+
+function applyNameStatus(files: DiffFileSummary[], output: string): DiffFileSummary[] {
+  const status = new Map<string, string>();
+  for (const line of output.split(/\r?\n/)) {
+    const [code, ...parts] = line.trim().split(/\s+/);
+    const file = parts.join(' ');
+    if (code && file) status.set(file, code);
+  }
+  return files.map(file => ({ ...file, status: status.get(file.path) || file.status }));
+}
 
 export async function diffCommand(): Promise<CommandResult> {
-  logger.section('CodeThon CLI — Git Diff');
-
-  const state = new StateManager();
-  const project = state.getProject();
-  if (!project) {
-    logger.error('No active project.');
-    return { success: false, message: 'No active project' };
-  }
-
   const runtime = getRuntime();
-  const result = await runtime.execute('git diff', 15000);
+  const diff = runtime.execute('git diff', 15000);
+  const numstat = runtime.execute('git diff --numstat', 15000);
+  const nameStatus = runtime.execute('git diff --name-status', 15000);
 
-  if (result.success && result.stdout) {
-    const lines = result.stdout.split('\n');
-    for (const line of lines) {
-      if (line.startsWith('+')) {
-        console.log(`  ${chalk.greenBright(line)}`);
-      } else if (line.startsWith('-')) {
-        console.log(`  ${chalk.redBright(line)}`);
-      } else if (line.startsWith('@@')) {
-        console.log(`  ${chalk.cyanBright(line)}`);
-      } else if (line.startsWith('diff --git') || line.startsWith('index') || line.startsWith('---') || line.startsWith('+++')) {
-        console.log(`  ${chalk.bold.magentaBright(line)}`);
-      } else {
-        console.log(`  ${chalk.whiteBright(line)}`);
-      }
-    }
-  } else {
-    logger.warn('No diff available');
+  if (!diff.success && diff.stderr) {
+    logger.warn(diff.stderr);
+    return { success: false, message: diff.stderr };
   }
 
-  return { success: true, message: 'Diff displayed' };
+  const files = applyNameStatus(parseNumstat(numstat.stdout || ''), nameStatus.stdout || '');
+  renderDiffViewer(files, diff.stdout || '');
+
+  return { success: true, message: 'Diff displayed', data: { files } as any };
 }

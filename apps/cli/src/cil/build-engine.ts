@@ -60,16 +60,16 @@ export class BuildEngine {
     const errors: string[] = [];
 
     const plan = await this.generatePlan(goal, analysis);
-    onToken?.(`\n  ${chalk.bold.cyan('BUILD PLAN')}\n`);
-    onToken?.(`  ${chalk.cyanBright('\u25B8')} ${plan.goal}\n\n`);
+    onToken?.(`\n  ${chalk.hex('#74d7ff').bold('BUILD PLAN')}\n`);
+    onToken?.(`  ${chalk.hex('#74d7ff')('\u25B8')} ${plan.goal}\n\n`);
 
     for (const step of plan.steps) {
-      onToken?.(`  ${chalk.yellowBright('\u25B8')} ${step.description}\n`);
+      onToken?.(`  ${chalk.hex('#ffcf5c')('\u25B8')} ${step.description}\n`);
 
       try {
         if ((step.type === 'create' || step.type === 'modify') && step.file && step.code) {
           if (this.dryRun) {
-            onToken?.(`    ${chalk.yellowBright('\u26A0')} [DRY RUN] Would write ${step.file}\n`);
+            onToken?.(`    ${chalk.hex('#ffcf5c')('\u26A0')} [DRY RUN] Would write ${step.file}\n`);
             filesWritten++;
             continue;
           }
@@ -81,16 +81,16 @@ export class BuildEngine {
               risk: step.type === 'modify' ? 'medium' : 'low',
             });
             if (!approved) {
-              onToken?.(`    ${chalk.yellowBright('\u26A0')} Skipped ${step.file} (rejected)\n`);
+              onToken?.(`    ${chalk.hex('#ffcf5c')('\u26A0')} Skipped ${step.file} (rejected)\n`);
               continue;
             }
           }
           await this.writeFile(step.file, step.code);
           filesWritten++;
-          onToken?.(`    ${chalk.greenBright('\u2713')} ${step.file}\n`);
+          onToken?.(`    ${chalk.hex('#82f7a6')('\u2713')} ${step.file}\n`);
         } else if (step.type === 'command' && step.command) {
           if (this.dryRun) {
-            onToken?.(`    ${chalk.yellowBright('\u26A0')} [DRY RUN] Would run: ${step.command}\n`);
+            onToken?.(`    ${chalk.hex('#ffcf5c')('\u26A0')} [DRY RUN] Would run: ${step.command}\n`);
             commandsRun++;
             continue;
           }
@@ -102,7 +102,7 @@ export class BuildEngine {
               risk: 'medium',
             });
             if (!approved) {
-              onToken?.(`    ${chalk.yellowBright('\u26A0')} Skipped command (rejected)\n`);
+              onToken?.(`    ${chalk.hex('#ffcf5c')('\u26A0')} Skipped command (rejected)\n`);
               continue;
             }
           }
@@ -117,12 +117,12 @@ export class BuildEngine {
           if (result.error) throw result.error;
           if (result.status !== 0) throw new Error(result.stderr?.toString() || `Exit code ${result.status}`);
           commandsRun++;
-          onToken?.(`    ${chalk.greenBright('\u2713')} ${step.command}\n`);
+          onToken?.(`    ${chalk.hex('#82f7a6')('\u2713')} ${step.command}\n`);
         }
       } catch (e: any) {
         const msg = `${step.type} failed: ${e.message}`;
         errors.push(msg);
-        onToken?.(`    ${chalk.redBright('\u2717')} ${msg}\n`);
+        onToken?.(`    ${chalk.hex('#ff5c7a')('\u2717')} ${msg}\n`);
       }
     }
 
@@ -156,11 +156,11 @@ export class BuildEngine {
     }
 
     if (!buildOutput) {
-      onToken?.(`  ${chalk.greenBright('\u2713')} No build errors found\n`);
+      onToken?.(`  ${chalk.hex('#82f7a6')('\u2713')} No build errors found\n`);
       return { filesFixed: 0, errors: [] };
     }
 
-    onToken?.(`\n  ${chalk.bold.yellowBright('FIXING BUILD ERRORS')}\n`);
+    onToken?.(`\n  ${chalk.hex('#ffcf5c').bold('FIXING BUILD ERRORS')}\n`);
 
     const errorsToFix = this.parseBuildErrors(buildOutput);
     const originalContents = new Map<string, string>();
@@ -174,7 +174,7 @@ export class BuildEngine {
     const fixPlan = await this.generateFixPlan(buildOutput, originalContents);
 
     for (const action of fixPlan) {
-      onToken?.(`  ${chalk.yellowBright('\u25B8')} ${action.description}\n`);
+      onToken?.(`  ${chalk.hex('#ffcf5c')('\u25B8')} ${action.description}\n`);
 
       try {
         if (action.type === 'file' && action.filePath) {
@@ -187,23 +187,23 @@ export class BuildEngine {
             if (current.includes(action.oldString)) {
               fs.writeFileSync(fullPath, current.replace(action.oldString, action.newString), 'utf-8');
               filesFixed++;
-              onToken?.(`    ${chalk.greenBright('\u2713')} Fixed ${action.filePath}\n`);
+              onToken?.(`    ${chalk.hex('#82f7a6')('\u2713')} Fixed ${action.filePath}\n`);
             } else if (action.content) {
               fs.writeFileSync(fullPath, action.content, 'utf-8');
               filesFixed++;
-              onToken?.(`    ${chalk.greenBright('\u2713')} Replaced ${action.filePath}\n`);
+              onToken?.(`    ${chalk.hex('#82f7a6')('\u2713')} Replaced ${action.filePath}\n`);
             } else {
-              onToken?.(`    ${chalk.redBright('\u2717')} Could not find match in ${action.filePath}\n`);
+              onToken?.(`    ${chalk.hex('#ff5c7a')('\u2717')} Could not find match in ${action.filePath}\n`);
             }
           } else if (action.content) {
             fs.writeFileSync(fullPath, action.content, 'utf-8');
             filesFixed++;
-            onToken?.(`    ${chalk.greenBright('\u2713')} Replaced ${action.filePath}\n`);
+            onToken?.(`    ${chalk.hex('#82f7a6')('\u2713')} Replaced ${action.filePath}\n`);
           }
         }
       } catch (e: any) {
         errors.push(e.message);
-        onToken?.(`    ${chalk.redBright('\u2717')} ${e.message}\n`);
+        onToken?.(`    ${chalk.hex('#ff5c7a')('\u2717')} ${e.message}\n`);
       }
     }
 

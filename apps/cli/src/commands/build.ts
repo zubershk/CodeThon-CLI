@@ -12,7 +12,7 @@ export async function buildCommand(goal?: string, askMode = false, dryRun = fals
   const project = state.getProject();
 
   if (!project) {
-    logger.error('No active project. Run `ct init` first.');
+    logger.error('No active project. Run `/init` inside ct, or `ct init` from your shell.');
     return { success: false, message: 'No active project' };
   }
 
@@ -45,9 +45,9 @@ export async function buildCommand(goal?: string, askMode = false, dryRun = fals
 
     // Summary
     logger.resultSummary('Build Complete', [
-      `${chalk.greenBright('Files created/modified')}: ${result.filesWritten}`,
-      `${chalk.cyanBright('Commands executed')}: ${result.commandsRun}`,
-      `${result.errors.length > 0 ? chalk.redBright('Errors') : chalk.greenBright('Errors')}: ${result.errors.length}`,
+      `${chalk.hex('#82f7a6')('Files created/modified')}: ${result.filesWritten}`,
+      `${chalk.hex('#74d7ff')('Commands executed')}: ${result.commandsRun}`,
+      `${result.errors.length > 0 ? chalk.hex('#ff5c7a')('Errors') : chalk.hex('#82f7a6')('Errors')}: ${result.errors.length}`,
     ]);
 
     state.updateProject({ outputs: [...(project.outputs || []), `Autonomous build: ${buildGoal}`] });

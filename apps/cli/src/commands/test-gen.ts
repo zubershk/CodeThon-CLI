@@ -18,14 +18,14 @@ export async function testGenCommand(...args: string[]): Promise<CommandResult> 
       ['mutate', 'Run mutation tests to measure test quality'],
     ];
     for (let i = 0; i < cmds.length; i++) {
-      logger.info(`  ${chalk.cyanBright(`[${i + 1}]`)} ${chalk.whiteBright(cmds[i][0].padEnd(14))} ${chalk.dim(cmds[i][1])}`);
+      logger.info(`  ${chalk.hex('#74d7ff')(`[${i + 1}]`)} ${chalk.hex('#f7fff9')(cmds[i][0].padEnd(14))} ${chalk.hex('#899691')(cmds[i][1])}`);
     }
     console.log('');
-    logger.info(chalk.dim('  Type /test <number> or /test <name>, e.g. /test 1 or /test status'));
+    logger.info(chalk.hex('#899691')('  Type /test <number> or /test <name>, e.g. /test 1 or /test status'));
     return { success: true, message: 'Test commands listed' };
   }
 
-  // Number alias: /test 1 → status
+  // Number alias: /test 1 -> status
   const numIndex = parseInt(sub, 10);
   const numMap = ['status', 'generate', 'generate-all', 'coverage', 'mutate'];
   if (!isNaN(numIndex) && numIndex >= 1 && numIndex <= numMap.length) {
@@ -35,9 +35,9 @@ export async function testGenCommand(...args: string[]): Promise<CommandResult> 
   if (sub === 'status') {
     const framework = testAgent.detectFramework();
     logger.section('Test Status');
-    logger.labelValue('Framework', framework, chalk.cyanBright);
+    logger.labelValue('Framework', framework, chalk.hex('#74d7ff'));
     if (framework === 'unknown') {
-      logger.info(chalk.yellowBright('  No test framework detected. Install vitest or jest to get started.'));
+      logger.info(chalk.hex('#ffcf5c')('  No test framework detected. Install vitest or jest to get started.'));
     }
     return { success: true, message: `Framework: ${framework}` };
   }
@@ -50,7 +50,7 @@ export async function testGenCommand(...args: string[]): Promise<CommandResult> 
     const result = await testAgent.generateTests(file);
     if (!result) { logger.error('Failed to generate tests'); return { success: false, message: 'Generation failed' }; }
     testAgent.writeTests([result]);
-    logger.success(`Tests written to ${chalk.cyanBright(result.file)}`);
+    logger.success(`Tests written to ${chalk.hex('#74d7ff')(result.file)}`);
     return { success: true, message: `Generated ${result.file}` };
   }
 
@@ -61,7 +61,7 @@ export async function testGenCommand(...args: string[]): Promise<CommandResult> 
     if (results.length === 0) { logger.info('No new tests needed'); return { success: true, message: 'No tests generated' }; }
     const count = testAgent.writeTests(results);
     logger.success(`Generated ${count} test file(s)`);
-    for (const r of results) logger.info(`  ${chalk.dim(r.file)}`);
+    for (const r of results) logger.info(`  ${chalk.hex('#899691')(r.file)}`);
     return { success: true, message: `${count} test(s) generated` };
   }
 
@@ -70,8 +70,8 @@ export async function testGenCommand(...args: string[]): Promise<CommandResult> 
     const report = await testAgent.analyzeCoverage();
     if (report.totalLines === 0) { logger.warn('Coverage not available. Try: vitest run --coverage'); return { success: false, message: 'No coverage data' }; }
     logger.section('Coverage Report');
-    logger.labelValue('Coverage', `${report.percentage}%`, report.percentage > 80 ? chalk.greenBright : chalk.yellowBright);
-    logger.labelValue('Covered', `${report.coveredLines}/${report.totalLines} lines`, chalk.cyanBright);
+    logger.labelValue('Coverage', `${report.percentage}%`, report.percentage > 80 ? chalk.hex('#82f7a6') : chalk.hex('#ffcf5c'));
+    logger.labelValue('Covered', `${report.coveredLines}/${report.totalLines} lines`, chalk.hex('#74d7ff'));
     return { success: true, message: `Coverage: ${report.percentage}%` };
   }
 
@@ -80,11 +80,11 @@ export async function testGenCommand(...args: string[]): Promise<CommandResult> 
     const result = await testAgent.runMutationTests();
     if (result.total === 0) { logger.warn('Mutation testing requires vitest or jest'); return { success: false, message: 'Unsupported framework' }; }
     logger.section('Mutation Test Results');
-    logger.labelValue('Passed', String(result.passed), chalk.greenBright);
-    logger.labelValue('Killed', String(result.killed), chalk.redBright);
-    logger.labelValue('Total', String(result.total), chalk.cyanBright);
+    logger.labelValue('Passed', String(result.passed), chalk.hex('#82f7a6'));
+    logger.labelValue('Killed', String(result.killed), chalk.hex('#ff5c7a'));
+    logger.labelValue('Total', String(result.total), chalk.hex('#74d7ff'));
     const score = result.total > 0 ? Math.round((result.killed / result.total) * 100) : 0;
-    logger.labelValue('Score', `${score}%`, score > 70 ? chalk.greenBright : chalk.yellowBright);
+    logger.labelValue('Score', `${score}%`, score > 70 ? chalk.hex('#82f7a6') : chalk.hex('#ffcf5c'));
     return { success: true, message: `Mutation score: ${score}%` };
   }
 

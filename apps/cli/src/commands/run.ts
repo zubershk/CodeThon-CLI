@@ -11,7 +11,7 @@ export async function runCommand(command: string[], askMode = false): Promise<Co
   }
 
   const cmd = command.join(' ');
-  logger.section(`CodeThon CLI — Run: ${chalk.bold(cmd)}`);
+  logger.section(`CodeThon CLI — Run: ${chalk.hex('#f7fff9').bold(cmd)}`);
 
   // Approval check
   if (askMode) {
@@ -22,7 +22,7 @@ export async function runCommand(command: string[], askMode = false): Promise<Co
       risk: cmd.startsWith('rm ') || cmd.startsWith('sudo ') ? 'high' : 'medium',
     });
     if (!approved) {
-      logger.info(`${chalk.yellowBright('\u26A0')} Command cancelled`);
+      logger.info(`${chalk.hex('#ffcf5c')('\u26A0')} Command cancelled`);
       return { success: false, message: 'Command rejected by user' };
     }
   }

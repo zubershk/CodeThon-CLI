@@ -19,17 +19,17 @@ function countNodes(nodes: Array<{ children?: any[] }>): number {
 function printRunFacts(rows: Array<{ label: string; value: string }>): void {
   const width = Math.max(60, Math.min(110, (process.stdout.columns || 88) - 4));
   const inner = width - 4;
-  console.log(`  ${chalk.cyan('┌')}${chalk.cyan('─'.repeat(width - 2))}${chalk.cyan('┐')}`);
-  console.log(`  ${chalk.cyan('│')} ${chalk.bold.whiteBright('Analysis run'.padEnd(inner))} ${chalk.cyan('│')}`);
-  console.log(`  ${chalk.cyan('├')}${chalk.cyan('─'.repeat(width - 2))}${chalk.cyan('┤')}`);
+  console.log(`  ${chalk.hex('#74d7ff')('┌')}${chalk.hex('#74d7ff')('─'.repeat(width - 2))}${chalk.hex('#74d7ff')('┐')}`);
+  console.log(`  ${chalk.hex('#74d7ff')('│')} ${chalk.hex('#f7fff9').bold('Analysis run'.padEnd(inner))} ${chalk.hex('#74d7ff')('│')}`);
+  console.log(`  ${chalk.hex('#74d7ff')('├')}${chalk.hex('#74d7ff')('─'.repeat(width - 2))}${chalk.hex('#74d7ff')('┤')}`);
   for (const row of rows) {
     const label = `${row.label}:`.padEnd(12);
     const value = row.value.replace(/\s+/g, ' ');
     const text = `${label} ${value}`;
     const clipped = text.length > inner ? `${text.slice(0, inner - 1)}…` : text.padEnd(inner);
-    console.log(`  ${chalk.cyan('│')} ${chalk.dim(clipped)} ${chalk.cyan('│')}`);
+    console.log(`  ${chalk.hex('#74d7ff')('│')} ${chalk.hex('#899691')(clipped)} ${chalk.hex('#74d7ff')('│')}`);
   }
-  console.log(`  ${chalk.cyan('└')}${chalk.cyan('─'.repeat(width - 2))}${chalk.cyan('┘')}`);
+  console.log(`  ${chalk.hex('#74d7ff')('└')}${chalk.hex('#74d7ff')('─'.repeat(width - 2))}${chalk.hex('#74d7ff')('┘')}`);
   console.log('');
 }
 
@@ -75,7 +75,7 @@ export async function analyzeCommand(targetDir?: string): Promise<CommandResult>
     }
   }
 
-  logger.section(`CodeThon CLI — Analysis: ${chalk.bold(path.basename(scanDir))}`);
+  logger.section(`CodeThon CLI — Analysis: ${chalk.hex('#f7fff9').bold(path.basename(scanDir))}`);
   printRunFacts([
     { label: 'Target', value: scanDir },
     { label: 'Checks', value: 'file tree, key configs, stack, entry points, missing files, static issues, AI summary' },
@@ -100,8 +100,8 @@ export async function analyzeCommand(targetDir?: string): Promise<CommandResult>
     if (summaryStreamed) process.stdout.write('\n');
 
     logger.labelValue('Name', analysis.name);
-    logger.labelValue('Tech Stack', analysis.techStack.join(', ') || chalk.gray('unknown'));
-    logger.labelValue('Entry Points', analysis.entryPoints.join(', ') || chalk.gray('none'));
+    logger.labelValue('Tech Stack', analysis.techStack.join(', ') || chalk.hex('#899691')('unknown'));
+    logger.labelValue('Entry Points', analysis.entryPoints.join(', ') || chalk.hex('#899691')('none'));
     logger.labelValue('Files/Folders Scanned', `${countNodes(analysis.structure)}`);
     logger.labelValue('Issues', `${analysis.issues.length}`);
     logger.labelValue('Missing Files', `${analysis.missingFiles.length}`);
@@ -116,7 +116,7 @@ export async function analyzeCommand(targetDir?: string): Promise<CommandResult>
         const connector = isLast ? '\u2514\u2500\u2500 ' : '\u251C\u2500\u2500 ';
         const display = path.relative(scanDir, node.path);
         if (!display.startsWith('..')) {
-          console.log(`  ${chalk.dim('\u2502')} ${prefix}${chalk.dim(connector)}${node.isDir ? chalk.bold.cyanBright(display) + '/' : chalk.whiteBright(display)}`);
+          console.log(`  ${chalk.hex('#899691')('\u2502')} ${prefix}${chalk.hex('#899691')(connector)}${node.isDir ? chalk.hex('#74d7ff').bold(display) + '/' : chalk.hex('#f7fff9')(display)}`);
           if (node.children) {
             printTree(node.children, prefix + (isLast ? '    ' : '\u2502   '));
           }
@@ -127,23 +127,23 @@ export async function analyzeCommand(targetDir?: string): Promise<CommandResult>
     const firstNodes = analysis.structure.slice(0, 30);
     printTree(firstNodes);
     if (analysis.structure.length > 30) {
-      console.log(`  ${chalk.dim('\u2502')}  ${chalk.dim('... and ' + (analysis.structure.length - 30) + ' more items')}`);
+      console.log(`  ${chalk.hex('#899691')('\u2502')}  ${chalk.hex('#899691')('... and ' + (analysis.structure.length - 30) + ' more items')}`);
     }
     process.stdout.write('\n');
 
     if (analysis.issues.length > 0) {
       logger.subsection('Issues Found');
       for (const issue of analysis.issues) {
-        const icon = issue.severity === 'critical' ? chalk.redBright('\u2717') :
-                     issue.severity === 'warning' ? chalk.yellowBright('\u26A0') :
-                     chalk.cyanBright('\u2139');
-        const sev = issue.severity === 'critical' ? chalk.redBright('CRITICAL') :
-                    issue.severity === 'warning' ? chalk.yellowBright('WARNING') :
-                    chalk.cyanBright('INFO');
-        console.log(`  ${icon} ${sev}${issue.file ? chalk.gray(` [${issue.file}]`) : ''}`);
-        console.log(`  ${chalk.dim('\u2502')}  ${chalk.whiteBright(issue.message)}`);
+        const icon = issue.severity === 'critical' ? chalk.hex('#ff5c7a')('\u2717') :
+                     issue.severity === 'warning' ? chalk.hex('#ffcf5c')('\u26A0') :
+                     chalk.hex('#74d7ff')('\u2139');
+        const sev = issue.severity === 'critical' ? chalk.hex('#ff5c7a')('CRITICAL') :
+                    issue.severity === 'warning' ? chalk.hex('#ffcf5c')('WARNING') :
+                    chalk.hex('#74d7ff')('INFO');
+        console.log(`  ${icon} ${sev}${issue.file ? chalk.hex('#899691')(` [${issue.file}]`) : ''}`);
+        console.log(`  ${chalk.hex('#899691')('\u2502')}  ${chalk.hex('#f7fff9')(issue.message)}`);
         if (issue.suggestion) {
-          console.log(`  ${chalk.dim('\u2502')}  ${chalk.greenBright('\u21E8')} ${chalk.gray(issue.suggestion)}`);
+          console.log(`  ${chalk.hex('#899691')('\u2502')}  ${chalk.hex('#82f7a6')('\u21E8')} ${chalk.hex('#899691')(issue.suggestion)}`);
         }
         console.log('');
       }
@@ -152,7 +152,7 @@ export async function analyzeCommand(targetDir?: string): Promise<CommandResult>
     if (analysis.missingFiles.length > 0) {
       logger.subsection('Missing Files');
       for (const f of analysis.missingFiles) {
-        console.log(`  ${chalk.yellowBright('\u26A0')} ${chalk.whiteBright(f)}`);
+        console.log(`  ${chalk.hex('#ffcf5c')('\u26A0')} ${chalk.hex('#f7fff9')(f)}`);
       }
       process.stdout.write('\n');
     }

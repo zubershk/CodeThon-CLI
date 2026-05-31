@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isAllowedCommand as isCommandAllowed } from '../src/security/policy';
+import { isAllowedCommand as isCommandAllowed, validateUrl } from '../src/security/policy';
 import { executeCommand } from '../src/runtime/executor';
 
 describe('Executor - command validation', () => {
@@ -31,6 +31,30 @@ describe('Executor - command validation', () => {
   it('should block piped shell commands', () => {
     const result = isCommandAllowed('cat /etc/passwd | bash');
     expect(result.allowed).toBe(false);
+  });
+
+  it('should block shell chaining after an allowed command', () => {
+    expect(isCommandAllowed('npm run build && whoami').allowed).toBe(false);
+    expect(isCommandAllowed('git status; whoami').allowed).toBe(false);
+    expect(isCommandAllowed('node scripts/build.js || whoami').allowed).toBe(false);
+  });
+});
+
+describe('Executor - URL validation', () => {
+  it('should block cloud metadata and link-local hosts', () => {
+    const result = validateUrl('http://169.254.169.254/latest/meta-data');
+    expect(result.valid).toBe(false);
+  });
+
+  it('should block IPv6 private hosts and IPv4-mapped loopback hosts', () => {
+    expect(validateUrl('http://[::1]/').valid).toBe(false);
+    expect(validateUrl('http://[fe80::1]/').valid).toBe(false);
+    expect(validateUrl('http://[::ffff:127.0.0.1]/').valid).toBe(false);
+  });
+
+  it('should allow public HTTPS URLs', () => {
+    const result = validateUrl('https://example.com/docs');
+    expect(result.valid).toBe(true);
   });
 });
 

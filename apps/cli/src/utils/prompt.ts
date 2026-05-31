@@ -304,33 +304,33 @@ async function readKeySelect<T>(message: string, choices: SimpleChoice<T>[]): Pr
       clearRender();
 
       const lines: string[] = [];
-      const hint = chalk.dim('Use ↑/↓, Enter to select, Esc to cancel');
+      const hint = chalk.hex('#899691')('Use ↑/↓, Enter to select, Esc to cancel');
       lines.push(`? ${message} ${hint}`);
       lines.push(`  ┌${'─'.repeat(innerWidth)}┐`);
 
       const visibleRows = rows.slice(rowScroll, rowScroll + maxRows);
       for (const row of visibleRows) {
         if (row.type === 'separator') {
-          lines.push(boxLine(`  ${row.label}`, chalk.magenta));
+          lines.push(boxLine(`  ${row.label}`, chalk.hex('#d7a3ff')));
           continue;
         }
 
         const isSelected = row.choiceIndex === selected;
         const { main, detail } = splitChoiceName(row.choice);
-        const prefix = isSelected ? '▶' : ' ';
-        lines.push(boxLine(`${prefix} ${main}`, isSelected ? chalk.cyanBright : undefined));
+        const prefix = isSelected ? '>' : ' ';
+        lines.push(boxLine(`${prefix} ${main}`, isSelected ? chalk.hex('#74d7ff') : undefined));
         if (isSelected && detail) {
-          lines.push(boxLine(`  ${detail}`, chalk.dim));
+          lines.push(boxLine(`  ${detail}`, chalk.hex('#899691')));
         }
       }
 
       if (rowScroll > 0 || rowScroll + maxRows < rows.length) {
         const top = rowScroll > 0 ? 'more above' : '';
         const bottom = rowScroll + maxRows < rows.length ? 'more below' : '';
-        lines.push(boxLine(`  ${[top, bottom].filter(Boolean).join(' · ')}`, chalk.dim));
+        lines.push(boxLine(`  ${[top, bottom].filter(Boolean).join(' · ')}`, chalk.hex('#899691')));
       }
 
-      lines.push(boxLine(`  ${selected + 1}/${selectable.length} · number keys also work`, chalk.dim));
+      lines.push(boxLine(`  ${selected + 1}/${selectable.length} · number keys also work`, chalk.hex('#899691')));
       lines.push(`  └${'─'.repeat(innerWidth)}┘`);
 
       stdout.write(`${lines.join('\n')}\n`);
@@ -349,7 +349,7 @@ async function readKeySelect<T>(message: string, choices: SimpleChoice<T>[]): Pr
       finished = true;
       clearRender();
       cleanup();
-      stdout.write(`? ${message} ${chalk.cyanBright(choiceLabel(selectable[selected]))}\n`);
+      stdout.write(`? ${message} ${chalk.hex('#74d7ff')(choiceLabel(selectable[selected]))}\n`);
       resolve(value);
     };
 
@@ -358,7 +358,7 @@ async function readKeySelect<T>(message: string, choices: SimpleChoice<T>[]): Pr
       finished = true;
       clearRender();
       cleanup();
-      stdout.write(`? ${message} ${chalk.dim('cancelled')}\n`);
+      stdout.write(`? ${message} ${chalk.hex('#899691')('cancelled')}\n`);
       reject(new PromptCancelledError());
     };
 
@@ -510,35 +510,35 @@ async function readKeyMultiSelect(message: string, choices: SimpleChoice<string>
       clearRender();
 
       const lines: string[] = [];
-      const hint = chalk.dim('Use ↑/↓, Space to toggle, Enter to continue, Esc to cancel');
+      const hint = chalk.hex('#899691')('Use ↑/↓, Space to toggle, Enter to continue, Esc to cancel');
       lines.push(`? ${message} ${hint}`);
       lines.push(`  ┌${'─'.repeat(innerWidth)}┐`);
 
       const visibleRows = rows.slice(rowScroll, rowScroll + maxRows);
       for (const row of visibleRows) {
         if (row.type === 'separator') {
-          lines.push(boxLine(`  ${row.label}`, chalk.magenta));
+          lines.push(boxLine(`  ${row.label}`, chalk.hex('#d7a3ff')));
           continue;
         }
 
         const isSelected = row.choiceIndex === selected;
         const isChecked = selectedValues.has(row.choice.value);
-        const marker = isChecked ? '●' : '○';
-        const pointer = isSelected ? '▶' : ' ';
+        const marker = isChecked ? '[x]' : '[ ]';
+        const pointer = isSelected ? '>' : ' ';
         const { main, detail } = splitChoiceName(row.choice);
-        lines.push(boxLine(`${pointer} ${marker} ${main}`, isSelected ? chalk.cyanBright : undefined));
+        lines.push(boxLine(`${pointer} ${marker} ${main}`, isSelected ? chalk.hex('#74d7ff') : undefined));
         if (isSelected && detail) {
-          lines.push(boxLine(`    ${detail}`, chalk.dim));
+          lines.push(boxLine(`    ${detail}`, chalk.hex('#899691')));
         }
       }
 
       if (rowScroll > 0 || rowScroll + maxRows < rows.length) {
         const top = rowScroll > 0 ? 'more above' : '';
         const bottom = rowScroll + maxRows < rows.length ? 'more below' : '';
-        lines.push(boxLine(`  ${[top, bottom].filter(Boolean).join(' · ')}`, chalk.dim));
+        lines.push(boxLine(`  ${[top, bottom].filter(Boolean).join(' · ')}`, chalk.hex('#899691')));
       }
 
-      lines.push(boxLine(`  ${selectedValues.size} selected · A all · N none · number keys toggle`, chalk.dim));
+      lines.push(boxLine(`  ${selectedValues.size} selected · A all · N none · number keys toggle`, chalk.hex('#899691')));
       lines.push(`  └${'─'.repeat(innerWidth)}┘`);
 
       stdout.write(`${lines.join('\n')}\n`);
@@ -561,7 +561,7 @@ async function readKeyMultiSelect(message: string, choices: SimpleChoice<string>
         .filter(choice => selectedValues.has(choice.value))
         .map(choice => choiceLabel(choice));
       const summary = labels.length > 0 ? labels.join(', ') : 'none';
-      stdout.write(`? ${message} ${chalk.cyanBright(summary)}\n`);
+      stdout.write(`? ${message} ${chalk.hex('#74d7ff')(summary)}\n`);
       resolve([...selectedValues]);
     };
 
@@ -570,7 +570,7 @@ async function readKeyMultiSelect(message: string, choices: SimpleChoice<string>
       finished = true;
       clearRender();
       cleanup();
-      stdout.write(`? ${message} ${chalk.dim('cancelled')}\n`);
+      stdout.write(`? ${message} ${chalk.hex('#899691')('cancelled')}\n`);
       reject(new PromptCancelledError());
     };
 

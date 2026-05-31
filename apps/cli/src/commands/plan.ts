@@ -47,17 +47,17 @@ function printPlanRunPanel(rows: Array<{ label: string; value: string }>): void 
   const title = 'Plan run';
   const subtitle = 'roadmap + architecture';
   const titleLine = `${title} ${subtitle}`.padEnd(inner);
-  console.log(`  ${chalk.cyan('┌')}${chalk.cyan('─'.repeat(width - 2))}${chalk.cyan('┐')}`);
-  console.log(`  ${chalk.cyan('│')} ${chalk.bold.whiteBright(titleLine.slice(0, title.length))}${chalk.dim(titleLine.slice(title.length))} ${chalk.cyan('│')}`);
-  console.log(`  ${chalk.cyan('├')}${chalk.cyan('─'.repeat(width - 2))}${chalk.cyan('┤')}`);
+  console.log(`  ${chalk.hex('#74d7ff')('┌')}${chalk.hex('#74d7ff')('─'.repeat(width - 2))}${chalk.hex('#74d7ff')('┐')}`);
+  console.log(`  ${chalk.hex('#74d7ff')('│')} ${chalk.hex('#f7fff9').bold(titleLine.slice(0, title.length))}${chalk.hex('#899691')(titleLine.slice(title.length))} ${chalk.hex('#74d7ff')('│')}`);
+  console.log(`  ${chalk.hex('#74d7ff')('├')}${chalk.hex('#74d7ff')('─'.repeat(width - 2))}${chalk.hex('#74d7ff')('┤')}`);
   for (const row of rows) {
     const label = `${row.label}:`.padEnd(10);
     const value = row.value.replace(/\s+/g, ' ');
     const text = `${label} ${value}`;
     const clipped = text.length > inner ? `${text.slice(0, inner - 1)}…` : text.padEnd(inner);
-    console.log(`  ${chalk.cyan('│')} ${chalk.dim(clipped)} ${chalk.cyan('│')}`);
+    console.log(`  ${chalk.hex('#74d7ff')('│')} ${chalk.hex('#899691')(clipped)} ${chalk.hex('#74d7ff')('│')}`);
   }
-  console.log(`  ${chalk.cyan('└')}${chalk.cyan('─'.repeat(width - 2))}${chalk.cyan('┘')}`);
+  console.log(`  ${chalk.hex('#74d7ff')('└')}${chalk.hex('#74d7ff')('─'.repeat(width - 2))}${chalk.hex('#74d7ff')('┘')}`);
   console.log('');
 }
 
@@ -97,7 +97,7 @@ export async function planCommand(args = ''): Promise<CommandResult> {
   const state = new StateManager();
   const project = state.getProject();
   if (!project) {
-    logger.error('No active project. Run `ct init` first.');
+    logger.error('No active project. Run `/init` inside ct, or `ct init` from your shell.');
     return { success: false, message: 'No active project' };
   }
 

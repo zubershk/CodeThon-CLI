@@ -1,26 +1,39 @@
 import chalk from 'chalk';
 import { renderAgentOutput, resultSummary as renderSummary } from './render';
+import { stripAnsi, truncateText } from '../ui/terminal-text';
 
 export type LogLevel = 'debug' | 'info' | 'success' | 'warn' | 'error' | 'highlight' | 'muted';
 
+const oled = {
+  cyan: chalk.hex('#74d7ff'),
+  lime: chalk.hex('#dfff72'),
+  green: chalk.hex('#82f7a6'),
+  amber: chalk.hex('#ffcf5c'),
+  red: chalk.hex('#ff5c7a'),
+  text: chalk.hex('#e0e6e1'),
+  bright: chalk.hex('#f7fff9'),
+  border: chalk.hex('#31413b'),
+  dim: chalk.hex('#899691'),
+};
+
 const PREFIXES: Record<LogLevel, string> = {
-  debug: chalk.dim('\u2502'),
-  info: chalk.cyan('\u25B8'),
-  success: chalk.green('\u2713'),
-  warn: chalk.yellow('\u26A0'),
-  error: chalk.red('\u2717'),
-  highlight: chalk.magenta('\u25C9'),
-  muted: chalk.dim('\u2502'),
+  debug: oled.dim('\u2502'),
+  info: oled.cyan('▶'),
+  success: oled.green('◆'),
+  warn: oled.amber('▲'),
+  error: oled.red('■'),
+  highlight: oled.lime('●'),
+  muted: oled.dim('\u2502'),
 };
 
 const COLORS: Record<LogLevel, (s: string) => string> = {
-  debug: chalk.dim,
-  info: chalk.whiteBright,
-  success: chalk.greenBright,
-  warn: chalk.yellowBright,
-  error: chalk.redBright,
-  highlight: chalk.magentaBright,
-  muted: chalk.gray,
+  debug: oled.dim,
+  info: chalk.hex('#f7fff9'),
+  success: oled.green,
+  warn: oled.amber,
+  error: oled.red,
+  highlight: oled.lime,
+  muted: oled.dim,
 };
 
 function center(text: string, width = 64): string {
@@ -32,6 +45,10 @@ function terminalRuleWidth(max = 110): number {
   return Math.max(60, Math.min(max, (process.stdout.columns || 88) - 4));
 }
 
+function padAnsi(value: string, width: number): string {
+  return value + ' '.repeat(Math.max(0, width - stripAnsi(value).length));
+}
+
 export function log(level: LogLevel, message: string): void {
   const prefix = PREFIXES[level];
   const colorize = COLORS[level];
@@ -39,28 +56,30 @@ export function log(level: LogLevel, message: string): void {
 }
 
 export function section(title: string): void {
-  const line = chalk.bold.cyan('\u2500'.repeat(terminalRuleWidth()));
+  const width = terminalRuleWidth(112);
+  const inner = width - 4;
+  const titleLine = `${oled.lime('\u25C6')}  ${oled.bright.bold(truncateText(title, inner - 16))} ${oled.dim('OLED DARK')}`;
   console.log('');
-  console.log(`  ${line}`);
-  console.log(`  ${chalk.bold.cyan('\u25C6')}  ${chalk.bold.whiteBright(title)}`);
-  console.log(`  ${line}`);
+  console.log(`  ${oled.cyan(`╭${'─'.repeat(width - 2)}╮`)}`);
+  console.log(`  ${oled.cyan('│')} ${padAnsi(titleLine, inner)} ${oled.cyan('│')}`);
+  console.log(`  ${oled.cyan(`╰${oled.border('─'.repeat(width - 2))}╯`)}`);
   console.log('');
 }
 
 export function subsection(title: string): void {
   console.log('');
-  console.log(`  ${chalk.bold.magentaBright('\u25B8')}  ${chalk.bold.whiteBright(title)}`);
-  console.log(`  ${chalk.dim.magentaBright('\u2500'.repeat(40))}`);
+  console.log(`  ${oled.cyan('\u25B8')}  ${oled.bright.bold(title)}`);
+  console.log(`  ${oled.border('\u2500'.repeat(Math.min(52, terminalRuleWidth(72))))}`);
 }
 
 export function divider(): void {
-  console.log(`  ${chalk.dim('\u2500'.repeat(terminalRuleWidth(96)))}`);
+  console.log(`  ${oled.dim('\u2500'.repeat(terminalRuleWidth(96)))}`);
 }
 
 export function commandBlock(command: string, description?: string): void {
-  console.log(`  ${chalk.cyanBright('$')} ${chalk.bold.whiteBright(command)}`);
+  console.log(`  ${oled.lime('$')} ${chalk.hex('#f7fff9').bold(command)}`);
   if (description) {
-    console.log(`  ${chalk.dim('\u2502')}  ${chalk.gray(description)}`);
+    console.log(`  ${oled.dim('\u2502')}  ${oled.dim(description)}`);
   }
 }
 
@@ -68,62 +87,62 @@ export function outputBlock(text: string): void {
   renderAgentOutput(text);
 }
 
-export function labelValue(label: string, value: string, labelColor = chalk.cyanBright): void {
-  console.log(`  ${chalk.bold(labelColor(label))}: ${chalk.whiteBright(value)}`);
+export function labelValue(label: string, value: string, labelColor = oled.cyan): void {
+  console.log(`  ${chalk.bold(labelColor(label.padEnd(14)))} ${oled.bright(value)}`);
 }
 
-export function bullet(text: string, color = chalk.whiteBright): void {
-  console.log(`  ${chalk.cyanBright('\u2022')} ${color(text)}`);
+export function bullet(text: string, color = chalk.hex('#f7fff9')): void {
+  console.log(`  ${oled.cyan('\u2022')} ${color(text)}`);
 }
 
 export function tip(text: string): void {
-  console.log(`  ${chalk.dim('\u2502')} ${chalk.bold.yellowBright('\u2726')} ${chalk.yellowBright(text)}`);
+  console.log(`  ${oled.dim('\u2502')} ${oled.lime('\u2726')} ${oled.amber(text)}`);
 }
 
 export function streamOutput(text: string): void {
-  process.stdout.write(chalk.whiteBright(text));
+  process.stdout.write(chalk.hex('#f7fff9')(text));
 }
 
 export function streamHeading(heading: string): void {
-  process.stdout.write(`\n  ${chalk.bold.cyanBright('\u2503')} ${chalk.bold.magentaBright(heading)}\n`);
+  process.stdout.write(`\n  ${oled.cyan('\u2503')} ${oled.lime(heading)}\n`);
 }
 
 export function showStartupTips(): void {
-  const line = chalk.bold.cyanBright('\u2500'.repeat(60));
+  const line = oled.cyan('\u2500'.repeat(60));
   console.log('');
-  console.log(`${center(chalk.bold.cyanBright('\u25C9\u25C9\u25C9  CodeThon CLI  \u25C9\u25C9\u25C9'))}`);
-  console.log(`${center(chalk.dim('AI-native execution orchestration for hackathons'))}`);
+  console.log(`${center(oled.lime('\u25C9\u25C9\u25C9  CodeThon CLI  \u25C9\u25C9\u25C9'))}`);
+  console.log(`${center(oled.dim('AI-native execution orchestration for hackathons'))}`);
   console.log(`  ${line}`);
   console.log('');
-  console.log(`  ${chalk.bold.whiteBright('\u25C6')}  ${chalk.bold.greenBright('WORKFLOW')}`);
-  console.log(`  ${chalk.dim('\u2502')}`);
-  console.log(`  ${chalk.dim('\u2502')}  ${chalk.cyanBright('ct init')}      ${chalk.gray('\u2014')}  ${chalk.whiteBright('Define your project')}`);
-  console.log(`  ${chalk.dim('\u2502')}  ${chalk.cyanBright('ct roadmap')}   ${chalk.gray('\u2014')}  ${chalk.whiteBright('Generate milestones')}`);
-  console.log(`  ${chalk.dim('\u2502')}  ${chalk.cyanBright('ct architect')} ${chalk.gray('\u2014')}  ${chalk.whiteBright('Design architecture')}`);
-  console.log(`  ${chalk.dim('\u2502')}  ${chalk.cyanBright('ct scaffold')}  ${chalk.gray('\u2014')}  ${chalk.whiteBright('Generate starter code')}`);
-  console.log(`  ${chalk.dim('\u2502')}  ${chalk.cyanBright('ct debug')}     ${chalk.gray('\u2014')}  ${chalk.whiteBright('Fix errors fast')}`);
-  console.log(`  ${chalk.dim('\u2502')}  ${chalk.cyanBright('ct deploy')}    ${chalk.gray('\u2014')}  ${chalk.whiteBright('Ship to production')}`);
-  console.log(`  ${chalk.dim('\u2502')}  ${chalk.cyanBright('ct launch')}    ${chalk.gray('\u2014')}  ${chalk.whiteBright('Generate submission assets')}`);
-  console.log(`  ${chalk.dim('\u2502')}`);
-  console.log(`  ${chalk.bold.whiteBright('\u25C6')}  ${chalk.bold.magentaBright('TOOLS')}`);
-  console.log(`  ${chalk.dim('\u2502')}`);
-  console.log(`  ${chalk.dim('\u2502')}  ${chalk.cyanBright('ct model')}     ${chalk.gray('\u2014')}  ${chalk.whiteBright('Switch AI model')}`);
-  console.log(`  ${chalk.dim('\u2502')}  ${chalk.cyanBright('ct status')}    ${chalk.gray('\u2014')}  ${chalk.whiteBright('Show project status')}`);
-  console.log(`  ${chalk.dim('\u2502')}  ${chalk.cyanBright('ct review')}    ${chalk.gray('\u2014')}  ${chalk.whiteBright('Review changes')}`);
-  console.log(`  ${chalk.dim('\u2502')}  ${chalk.cyanBright('ct clear')}     ${chalk.gray('\u2014')}  ${chalk.whiteBright('Clear terminal')}`);
-  console.log(`  ${chalk.dim('\u2502')}  ${chalk.cyanBright('ct startup')}   ${chalk.gray('\u2014')}  ${chalk.whiteBright('Startup analysis')}`);
-  console.log(`  ${chalk.dim('\u2502')}`);
-  console.log(`  ${chalk.bold.whiteBright('\u25C6')}  ${chalk.bold.greenBright('AUTONOMOUS')}`);
-  console.log(`  ${chalk.dim('\u2502')}`);
-  console.log(`  ${chalk.dim('\u2502')}  ${chalk.cyanBright('ct analyze')}   ${chalk.gray('\u2014')}  ${chalk.whiteBright('Scan repo, find issues')}`);
-  console.log(`  ${chalk.dim('\u2502')}  ${chalk.cyanBright('ct build')}     ${chalk.gray('\u2014')}  ${chalk.whiteBright('Auto-generate code & fix')}`);
-  console.log(`  ${chalk.dim('\u2502')}  ${chalk.cyanBright('ct autofix')}   ${chalk.gray('\u2014')}  ${chalk.whiteBright('Auto-fix build errors')}`);
-  console.log(`  ${chalk.dim('\u2502')}  ${chalk.cyanBright('ct execute')}   ${chalk.gray('\u2014')}  ${chalk.whiteBright('Autonomous agent — loops until done')}`);
-  console.log(`  ${chalk.dim('\u2502')}`);
-  console.log(`  ${chalk.bold.whiteBright('\u2726')}  ${chalk.yellowBright('Start with')} ${chalk.cyanBright('ct init')} ${chalk.yellowBright('to begin your project')}`);
+  console.log(`  ${chalk.hex('#f7fff9').bold('\u25C6')}  ${oled.green('WORKFLOW')}`);
+  console.log(`  ${oled.dim('\u2502')}`);
+  console.log(`  ${oled.dim('\u2502')}  ${oled.cyan('/init')}      ${oled.dim('\u2014')}  ${chalk.hex('#f7fff9')('Define your project')}`);
+  console.log(`  ${oled.dim('\u2502')}  ${oled.cyan('/roadmap')}   ${oled.dim('\u2014')}  ${chalk.hex('#f7fff9')('Generate milestones')}`);
+  console.log(`  ${oled.dim('\u2502')}  ${oled.cyan('/architect')} ${oled.dim('\u2014')}  ${chalk.hex('#f7fff9')('Design architecture')}`);
+  console.log(`  ${oled.dim('\u2502')}  ${oled.cyan('/scaffold')}  ${oled.dim('\u2014')}  ${chalk.hex('#f7fff9')('Generate starter code')}`);
+  console.log(`  ${oled.dim('\u2502')}  ${oled.cyan('/debug')}     ${oled.dim('\u2014')}  ${chalk.hex('#f7fff9')('Fix errors fast')}`);
+  console.log(`  ${oled.dim('\u2502')}  ${oled.cyan('/deploy')}    ${oled.dim('\u2014')}  ${chalk.hex('#f7fff9')('Ship to production')}`);
+  console.log(`  ${oled.dim('\u2502')}  ${oled.cyan('/launch')}    ${oled.dim('\u2014')}  ${chalk.hex('#f7fff9')('Generate submission assets')}`);
+  console.log(`  ${oled.dim('\u2502')}`);
+  console.log(`  ${chalk.hex('#f7fff9').bold('\u25C6')}  ${oled.lime('TOOLS')}`);
+  console.log(`  ${oled.dim('\u2502')}`);
+  console.log(`  ${oled.dim('\u2502')}  ${oled.cyan('/model')}     ${oled.dim('\u2014')}  ${chalk.hex('#f7fff9')('Switch AI model')}`);
+  console.log(`  ${oled.dim('\u2502')}  ${oled.cyan('/status')}    ${oled.dim('\u2014')}  ${chalk.hex('#f7fff9')('Show project status')}`);
+  console.log(`  ${oled.dim('\u2502')}  ${oled.cyan('/review')}    ${oled.dim('\u2014')}  ${chalk.hex('#f7fff9')('Review changes')}`);
+  console.log(`  ${oled.dim('\u2502')}  ${oled.cyan('/clear')}     ${oled.dim('\u2014')}  ${chalk.hex('#f7fff9')('Clear terminal')}`);
+  console.log(`  ${oled.dim('\u2502')}  ${oled.cyan('/startup')}   ${oled.dim('\u2014')}  ${chalk.hex('#f7fff9')('Startup analysis')}`);
+  console.log(`  ${oled.dim('\u2502')}`);
+  console.log(`  ${chalk.hex('#f7fff9').bold('\u25C6')}  ${oled.green('AUTONOMOUS')}`);
+  console.log(`  ${oled.dim('\u2502')}`);
+  console.log(`  ${oled.dim('\u2502')}  ${oled.cyan('/analyze')}   ${oled.dim('\u2014')}  ${chalk.hex('#f7fff9')('Scan repo, find issues')}`);
+  console.log(`  ${oled.dim('\u2502')}  ${oled.cyan('/build')}     ${oled.dim('\u2014')}  ${chalk.hex('#f7fff9')('Auto-generate code and fix')}`);
+  console.log(`  ${oled.dim('\u2502')}  ${oled.cyan('/autofix')}   ${oled.dim('\u2014')}  ${chalk.hex('#f7fff9')('Auto-fix build errors')}`);
+  console.log(`  ${oled.dim('\u2502')}  ${oled.cyan('/execute')}   ${oled.dim('\u2014')}  ${chalk.hex('#f7fff9')('Autonomous agent loops until done')}`);
+  console.log(`  ${oled.dim('\u2502')}`);
+  console.log(`  ${chalk.hex('#f7fff9').bold('\u2726')}  ${oled.amber('Start with')} ${oled.cyan('/init')} ${oled.amber('inside the REPL')}`);
   console.log(`  ${line}`);
   console.log('');
-  console.log(`  ${center(chalk.gray('Get help: ct <command> --help'))}`);
+  console.log(`  ${center(oled.dim('Get help: /help inside ct, or ct <command> --help'))}`);
   console.log('');
 }
 

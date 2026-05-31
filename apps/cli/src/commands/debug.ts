@@ -83,7 +83,7 @@ export async function debugCommand(errorInput?: string): Promise<CommandResult> 
 
       if (wantFix) {
         logger.info('');
-        logger.info(`${chalk.cyanBright('\u25B8')} Running auto-fix...\n`);
+        logger.info(`${chalk.hex('#74d7ff')('\u25B8')} Running auto-fix...\n`);
 
         const engine = new (await import('../cil/build-engine')).BuildEngine(process.cwd());
         const fixResult = await engine.autoFix((token) => {
@@ -93,7 +93,7 @@ export async function debugCommand(errorInput?: string): Promise<CommandResult> 
         console.log('');
         if (fixResult.filesFixed > 0) {
           logger.resultSummary('Auto-Fix Applied', [
-            `${chalk.greenBright('Files fixed')}: ${fixResult.filesFixed}`,
+            `${chalk.hex('#82f7a6')('Files fixed')}: ${fixResult.filesFixed}`,
           ]);
         }
       }

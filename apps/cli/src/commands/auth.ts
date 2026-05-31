@@ -103,11 +103,11 @@ export async function authAddCommand(): Promise<CommandResult> {
         })).trim();
       }
 
-      logger.info(`  ${chalk.dim('Validating...')}`);
+      logger.info(`  ${chalk.hex('#899691')('Validating...')}`);
       const err = await validateApiKey(provider, apiKey);
       if (err) {
         logger.error(`  ${err}`);
-        logger.info(`  ${chalk.dim(`Get key: ${setup.url}`)}`);
+        logger.info(`  ${chalk.hex('#899691')(`Get key: ${setup.url}`)}`);
         console.log('');
         apiKey = '';
         const retry = await promptConfirm({ message: 'Try again?', defaultValue: true });
@@ -124,14 +124,14 @@ export async function authAddCommand(): Promise<CommandResult> {
     } catch { /* non-critical */ }
     logger.success('  API key valid');
   } else {
-    logger.info(`  ${chalk.dim('Local provider — no API key needed.')}`);
+    logger.info(`  ${chalk.hex('#899691')('Local provider — no API key needed.')}`);
   }
 
   const models = getModelsForProvider(provider);
   const model = await promptSelect({
     message: 'Choose the default model for this provider:',
     choices: models.map(entry => ({
-      name: `  ${entry.name}  ${chalk.dim(`${formatContextWindow(entry.contextWindow)} ctx`)}  ${entry.pricing === 'Free' ? chalk.green('Free') : chalk.dim(entry.pricing)}${entry.recommended ? ` ${chalk.bgGreen.black(' BEST ')}` : ''}`,
+      name: `  ${entry.name}  ${chalk.hex('#899691')(`${formatContextWindow(entry.contextWindow)} ctx`)}  ${entry.pricing === 'Free' ? chalk.hex('#82f7a6')('Free') : chalk.hex('#899691')(entry.pricing)}${entry.recommended ? ` ${chalk.bgHex('#82f7a6').hex('#00110b')(' BEST ')}` : ''}`,
       value: entry.id,
     })),
   });
@@ -146,7 +146,7 @@ export async function authAddCommand(): Promise<CommandResult> {
 
   logger.success(`  Provider set to ${getProviderDisplayName(provider)}`);
   if (pickedModel) {
-    logger.info(`  Default model: ${chalk.bold(pickedModel.name)}`);
+    logger.info(`  Default model: ${chalk.hex('#f7fff9').bold(pickedModel.name)}`);
   }
 
   printActionHints('Suggested next actions', [
@@ -185,7 +185,7 @@ export async function authListCommand(): Promise<CommandResult> {
   if (configured.length === 0) {
     logger.info('  No providers configured.');
     logger.info(`  Active selection: ${getProviderDisplayName(activeProvider)}${activeModel ? ` · ${activeModel}` : ''}`);
-    logger.info(`  ${chalk.dim('Run')} ${chalk.cyanBright('ct auth add')} ${chalk.dim('to set one up.')}`);
+    logger.info(`  ${chalk.hex('#899691')('Run')} ${chalk.hex('#74d7ff')('ct auth add')} ${chalk.hex('#899691')('to set one up.')}`);
     return { success: true, message: 'No providers configured' };
   }
 
@@ -195,12 +195,12 @@ export async function authListCommand(): Promise<CommandResult> {
     const isLocal = !setup?.envVar;
     const hasKey = hasProviderCredential(p.value);
     if ((hasKey && !isLocal) || isActive) {
-      const active = isActive ? chalk.green(' (active)') : '';
+      const active = isActive ? chalk.hex('#82f7a6')(' (active)') : '';
       const keyStatus = isLocal
-        ? chalk.yellow('\u25CE')
+        ? chalk.hex('#ffcf5c')('\u25CE')
         : hasKey
-          ? chalk.green('\u2713')
-          : chalk.red('\u2717');
+          ? chalk.hex('#82f7a6')('\u2713')
+          : chalk.hex('#ff5c7a')('\u2717');
       logger.info(`  ${keyStatus} ${getProviderDisplayName(p.value)}${active}`);
     }
   }
@@ -230,14 +230,14 @@ export async function authTestCommand(providerArg?: string): Promise<CommandResu
   logger.section(`Testing ${target}`);
 
   if (!setup.envVar) {
-    logger.info(`  ${chalk.yellow('\u26A0')} Local providers require a running server.`);
+    logger.info(`  ${chalk.hex('#ffcf5c')('\u26A0')} Local providers require a running server.`);
     return { success: true, message: `Test skipped for ${target}` };
   }
 
   const apiKey = process.env[setup.envVar] || config.apiKey;
   if (!apiKey) {
     logger.error(`  No API key found for ${target}.`);
-    logger.info(`  ${chalk.dim('Run')} ${chalk.cyanBright('ct auth add')} ${chalk.dim('to configure.')}`);
+    logger.info(`  ${chalk.hex('#899691')('Run')} ${chalk.hex('#74d7ff')('ct auth add')} ${chalk.hex('#899691')('to configure.')}`);
     return { success: false, message: 'No API key' };
   }
 
@@ -247,15 +247,15 @@ export async function authTestCommand(providerArg?: string): Promise<CommandResu
   const latency = Date.now() - start;
 
   if (err) {
-    logger.error(`  ${chalk.red('\u2717')} Authentication: FAILED`);
-    logger.info(`  ${chalk.dim('Latency:')} ${latency}ms`);
-    logger.info(`  ${chalk.dim('Error:')} ${err}`);
+    logger.error(`  ${chalk.hex('#ff5c7a')('\u2717')} Authentication: FAILED`);
+    logger.info(`  ${chalk.hex('#899691')('Latency:')} ${latency}ms`);
+    logger.info(`  ${chalk.hex('#899691')('Error:')} ${err}`);
     return { success: false, message: `Auth failed: ${err}` };
   }
 
-  logger.success(`  ${chalk.green('\u2713')} Authentication: OK`);
-  logger.info(`  ${chalk.dim('Latency:')} ${latency}ms`);
-  logger.info(`  ${chalk.dim('Model:')} ${config.model || 'default'}`);
+  logger.success(`  ${chalk.hex('#82f7a6')('\u2713')} Authentication: OK`);
+  logger.info(`  ${chalk.hex('#899691')('Latency:')} ${latency}ms`);
+  logger.info(`  ${chalk.hex('#899691')('Model:')} ${config.model || 'default'}`);
 
   return { success: true, message: `${target} is working (${latency}ms)` };
 }
@@ -267,8 +267,8 @@ export async function authSwitchCommand(): Promise<CommandResult> {
     const setup = PROVIDER_SETUP[p.value];
     const hasKey = setup?.envVar ? !!process.env[setup.envVar] : true;
     const isActive = p.value === config.provider;
-    const keyIcon = hasKey ? chalk.green('\u2713') : chalk.dim('\u25CB');
-    const activeLabel = isActive ? chalk.green(' (active)') : '';
+    const keyIcon = hasKey ? chalk.hex('#82f7a6')('\u2713') : chalk.hex('#899691')('\u25CB');
+    const activeLabel = isActive ? chalk.hex('#82f7a6')(' (active)') : '';
     return { name: `  ${keyIcon} ${p.name}${activeLabel}`, value: p.value };
   });
 
@@ -282,7 +282,7 @@ export async function authSwitchCommand(): Promise<CommandResult> {
 
   const setup = PROVIDER_SETUP[provider];
   if (setup?.envVar && !process.env[setup.envVar]) {
-    logger.warn(`  ${setup.envVar} is not set. Run ${chalk.cyanBright('ct auth add')} to provide a key.`);
+    logger.warn(`  ${setup.envVar} is not set. Run ${chalk.hex('#74d7ff')('ct auth add')} to provide a key.`);
   }
 
   return { success: true, message: `Switched to ${provider}` };
@@ -324,8 +324,8 @@ export async function authRemoveCommand(providerArg?: string): Promise<CommandRe
     delete process.env[setup.envVar];
     logger.info(`  Removed the stored credential for ${target}.`);
     logger.info(`  If you also exported ${setup.envVar} in your shell profile, remove it there as well.`);
-    logger.info(`  ${chalk.dim('PowerShell:')} ${chalk.cyanBright(`Remove-Item Env:${setup.envVar}`)}`);
-    logger.info(`  ${chalk.dim('CMD:')} ${chalk.cyanBright(`set ${setup.envVar}=`)}`);
+    logger.info(`  ${chalk.hex('#899691')('PowerShell:')} ${chalk.hex('#74d7ff')(`Remove-Item Env:${setup.envVar}`)}`);
+    logger.info(`  ${chalk.hex('#899691')('CMD:')} ${chalk.hex('#74d7ff')(`set ${setup.envVar}=`)}`);
 
     if (config.provider === target) {
       const remaining = ALL_PROVIDERS.filter(p => {
@@ -353,6 +353,6 @@ export async function authLogoutCommand(): Promise<CommandResult> {
     await clearAllSecrets();
   } catch { /* non-critical */ }
   logger.success('All credentials and configuration cleared.');
-  logger.info(`  ${chalk.dim('Run')} ${chalk.cyanBright('ct')} ${chalk.dim('to restart setup.')}`);
+  logger.info(`  ${chalk.hex('#899691')('Run')} ${chalk.hex('#74d7ff')('ct')} ${chalk.hex('#899691')('to restart setup.')}`);
   return { success: true, message: 'Logged out' };
 }

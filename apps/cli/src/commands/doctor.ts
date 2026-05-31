@@ -251,16 +251,16 @@ export async function doctorCommand(): Promise<CommandResult> {
   const fail = checks.filter(c => c.status === 'fail');
 
   for (const c of checks) {
-    const icon = c.status === 'pass' ? chalk.green('\u2713')
-      : c.status === 'warn' ? chalk.yellow('\u26A0')
-      : chalk.red('\u2717');
-    const name = c.status === 'pass' ? chalk.white(c.name)
-      : c.status === 'warn' ? chalk.white(c.name)
-      : chalk.white(c.name);
-    const msg = chalk.dim(c.message);
+    const icon = c.status === 'pass' ? chalk.hex('#82f7a6')('\u2713')
+      : c.status === 'warn' ? chalk.hex('#ffcf5c')('\u26A0')
+      : chalk.hex('#ff5c7a')('\u2717');
+    const name = c.status === 'pass' ? chalk.hex('#e0e6e1')(c.name)
+      : c.status === 'warn' ? chalk.hex('#e0e6e1')(c.name)
+      : chalk.hex('#e0e6e1')(c.name);
+    const msg = chalk.hex('#899691')(c.message);
     console.log(`  ${icon} ${name}  ${msg}`);
     if (c.fix && c.status !== 'pass') {
-      console.log(`     ${chalk.dim('Fix:')} ${chalk.cyan(c.fix)}`);
+      console.log(`     ${chalk.hex('#899691')('Fix:')} ${chalk.hex('#74d7ff')(c.fix)}`);
     }
   }
 
@@ -271,12 +271,12 @@ export async function doctorCommand(): Promise<CommandResult> {
     logger.success(`${pass.length} passed, ${warn.length} warnings. Ready to build.`);
   } else {
     logger.resultSummary('Health Report', [
-      `${chalk.green(`${pass.length} passed`)}`,
-      `${chalk.yellow(`${warn.length} warnings`)}`,
-      `${chalk.red(`${fail.length} failures`)}`,
+      `${chalk.hex('#82f7a6')(`${pass.length} passed`)}`,
+      `${chalk.hex('#ffcf5c')(`${warn.length} warnings`)}`,
+      `${chalk.hex('#ff5c7a')(`${fail.length} failures`)}`,
     ]);
     console.log('');
-    logger.info(`  ${chalk.dim('Fix the failures above, then run')} ${chalk.cyanBright('ct doctor')} ${chalk.dim('again.')}`);
+    logger.info(`  ${chalk.hex('#899691')('Fix the failures above, then run')} ${chalk.hex('#74d7ff')('/doctor')} ${chalk.hex('#899691')('inside ct, or')} ${chalk.hex('#74d7ff')('ct doctor')} ${chalk.hex('#899691')('from your shell.')}`);
   }
 
   const actions = fail.length > 0

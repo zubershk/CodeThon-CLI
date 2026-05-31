@@ -9,33 +9,33 @@ export function renderMarkdown(text: string): string {
 
     // Code block markers - pass through
     if (trimmed.startsWith('```')) {
-      result.push(chalk.dim(line));
+      result.push(chalk.hex('#899691')(line));
       continue;
     }
 
     // Headings
     if (trimmed.startsWith('### ')) {
-      result.push(chalk.bold.cyanBright(line));
+      result.push(chalk.hex('#74d7ff').bold(line));
       continue;
     }
     if (trimmed.startsWith('## ')) {
-      result.push(chalk.bold.whiteBright(line));
+      result.push(chalk.hex('#f7fff9').bold(line));
       continue;
     }
     if (trimmed.startsWith('# ')) {
-      result.push(chalk.bold.yellowBright(line));
+      result.push(chalk.hex('#ffcf5c').bold(line));
       continue;
     }
 
     // Horizontal rule
     if (/^-{3,}$/.test(trimmed)) {
-      result.push(chalk.dim('\u2500'.repeat(50)));
+      result.push(chalk.hex('#899691')('\u2500'.repeat(50)));
       continue;
     }
 
     // Bullet points
     if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
-      result.push(chalk.dim('\u2502') + '  ' + chalk.cyanBright('\u2022') + ' ' + renderInline(trimmed.slice(2)));
+      result.push(chalk.hex('#899691')('\u2502') + '  ' + chalk.hex('#74d7ff')('\u2022') + ' ' + renderInline(trimmed.slice(2)));
       continue;
     }
 
@@ -43,25 +43,25 @@ export function renderMarkdown(text: string): string {
     if (/^\d+\.\s/.test(trimmed)) {
       const match = trimmed.match(/^(\d+\.\s)(.*)/);
       if (match) {
-        result.push(chalk.dim('\u2502') + '  ' + chalk.cyanBright(match[1]) + renderInline(match[2]));
+        result.push(chalk.hex('#899691')('\u2502') + '  ' + chalk.hex('#74d7ff')(match[1]) + renderInline(match[2]));
         continue;
       }
     }
 
     // Blockquotes
     if (trimmed.startsWith('> ')) {
-      result.push(chalk.dim('\u2502') + '  ' + chalk.italic.gray(trimmed.slice(2)));
+      result.push(chalk.hex('#899691')('\u2502') + '  ' + chalk.hex('#899691').italic(trimmed.slice(2)));
       continue;
     }
 
     // Code blocks (inline)
     if (trimmed.startsWith('    ') || trimmed.startsWith('\t')) {
-      result.push(chalk.dim('\u2502') + '  ' + chalk.gray(line));
+      result.push(chalk.hex('#899691')('\u2502') + '  ' + chalk.hex('#899691')(line));
       continue;
     }
 
     // Regular text
-    result.push(chalk.dim('\u2502') + '  ' + renderInline(line));
+    result.push(chalk.hex('#899691')('\u2502') + '  ' + renderInline(line));
   }
 
   return result.join('\n');
@@ -71,20 +71,20 @@ function renderInline(text: string): string {
   let result = text;
 
   // Bold (**text** or __text__)
-  result = result.replace(/\*\*(.+?)\*\*/g, (_, content) => chalk.bold.whiteBright(content));
-  result = result.replace(/__(.+?)__/g, (_, content) => chalk.bold.whiteBright(content));
+  result = result.replace(/\*\*(.+?)\*\*/g, (_, content) => chalk.hex('#f7fff9').bold(content));
+  result = result.replace(/__(.+?)__/g, (_, content) => chalk.hex('#f7fff9').bold(content));
 
   // Inline code (`code`)
-  result = result.replace(/`([^`]+)`/g, (_, code) => chalk.cyan(code));
+  result = result.replace(/`([^`]+)`/g, (_, code) => chalk.hex('#74d7ff')(code));
 
   // Italic (*text*)
-  result = result.replace(/\*(.+?)\*/g, (_, content) => chalk.italic(content));
+  result = result.replace(/\*(.+?)\*/g, (_, content) => chalk.hex('#e0e6e1').italic(content));
 
   // Links [text](url)
-  result = result.replace(/\[([^\]]+)\]\([^)]+\)/g, (_, text) => chalk.underline.cyanBright(text));
+  result = result.replace(/\[([^\]]+)\]\([^)]+\)/g, (_, text) => chalk.hex('#74d7ff').underline(text));
 
   // Strikethrough
-  result = result.replace(/~~(.+?)~~/g, (_, content) => chalk.strikethrough.gray(content));
+  result = result.replace(/~~(.+?)~~/g, (_, content) => chalk.hex('#899691').strikethrough(content));
 
   return result;
 }

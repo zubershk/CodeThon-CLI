@@ -21,6 +21,8 @@ import {
   statusCommand,
   reviewCommand,
   clearCommand,
+  diffCommand,
+  analyticsCommand,
   analyzeCommand,
   buildCommand,
   autofixCommand,
@@ -35,6 +37,10 @@ import {
   testGenCommand,
   profileCommand,
   checkpointCommand,
+  inspectCommand,
+  replayCommand,
+  graphCommand,
+  memoryCommand,
   onboardCommand,
   authAddCommand,
   authListCommand,
@@ -51,6 +57,7 @@ import fs from 'fs';
 import path from 'path';
 import { PromptCancelledError } from './utils/prompt';
 import { promptConfirm } from './utils/prompt';
+import { CODETHON_VERSION } from './utils/version';
 function loadDotenv(startDir: string): void {
   const candidate = path.join(startDir, '.env');
   if (fs.existsSync(candidate)) {
@@ -68,6 +75,7 @@ import { getLLMConfig, getRepoRoot, getSessionProjectId, getThemeMode, validateP
 import { printActionHints, printHero } from './utils/experience';
 import { findScopedCommandSuggestions, formatCliUsage } from './utils/command-registry';
 import { theme } from './ui/theme';
+import { renderCommandWorkspaceSummary, shouldRenderCommandWorkspace } from './tui/ink-command-workspace';
 const repoRoot = getRepoRoot();
 if (repoRoot && !getSessionProjectId(repoRoot)) {
   // No active session for this repo — that's fine, new repos have no state
@@ -83,11 +91,13 @@ const program = new Command();
 program
   .name('ct')
   .description('CodeThon CLI — AI-native execution orchestration for hackathons')
-  .version('1.0.0')
+  .version(CODETHON_VERSION)
   .option('--debug', 'enable verbose debug output')
   .option('-o, --output <format>', 'output format (text|json)', 'text')
   .option('-a, --ask', 'require approval before running commands or modifying files')
-  .option('-n, --dry-run', 'show what would be done without making changes');
+  .option('-n, --dry-run', 'show what would be done without making changes')
+  .option('--tui', 'force the terminal workspace when the terminal supports it')
+  .option('--no-tui', 'use scrollback-safe line output instead of the terminal workspace');
 
 async function ensureAiReady(commandName: string, output: string): Promise<{ success: boolean; message: string } | null> {
   const check = validateProviderConfig();
@@ -128,19 +138,33 @@ async function ensureAiReady(commandName: string, output: string): Promise<{ suc
 
 function runHandler<T extends { success: boolean; message: string }>(fn: () => Promise<T>, options?: { requiresAI?: boolean; commandName?: string }): void {
   const output = program.getOptionValue('output') as string;
+  const tuiEnabled = program.getOptionValue('tui') !== false;
+  const commandName = options?.commandName || currentCommandLabel();
+  const startedAt = Date.now();
   Promise.resolve()
     .then(async () => {
       if (options?.requiresAI) {
-        const preflight = await ensureAiReady(options.commandName || 'This command', output);
+        const preflight = await ensureAiReady(commandName || 'This command', output);
         if (preflight) {
           return preflight as T;
         }
       }
       return fn();
     })
-    .then(result => {
+    .then(async result => {
     if (output === 'json') {
       console.log(JSON.stringify(result, null, 2));
+    }
+    if (shouldRenderCommandWorkspace(commandName, output, tuiEnabled)) {
+      const llm = getLLMConfig();
+      await renderCommandWorkspaceSummary({
+        command: commandName,
+        result,
+        durationMs: Date.now() - startedAt,
+        provider: llm.provider,
+        model: llm.model || 'not set',
+        cwd: process.cwd(),
+      });
     }
     if (!result.success) process.exitCode = 1;
   }).catch(error => {
@@ -152,6 +176,16 @@ function runHandler<T extends { success: boolean; message: string }>(fn: () => P
     logger.error(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     process.exitCode = 1;
   });
+}
+
+function currentCommandLabel(): string {
+  const parts = process.argv.slice(2).filter(arg => !arg.startsWith('-'));
+  if (parts.length === 0) return 'ct';
+  const first = parts[0].toLowerCase();
+  if (['auth', 'git', 'test', 'checkpoint'].includes(first) && parts[1]) {
+    return `ct ${parts[0]} ${parts[1]}`;
+  }
+  return `ct ${parts[0]}`;
 }
 
 program
@@ -242,7 +276,7 @@ program
 program
   .command('diff')
   .description('Show full git diff for current changes')
-  .action(() => runHandler(() => gitCommand('diff')));
+  .action(() => runHandler(() => diffCommand()));
 
 program
   .command('clear')
@@ -277,11 +311,23 @@ program
 program
   .command('execute')
   .description('Autonomous execution agent — loops, plans, researches, builds, fixes until goal is met')
-  .argument('<goal>', 'what to build or accomplish')
-  .action((goal: string) => runHandler(() => {
+  .argument('<goal...>', 'what to build or accomplish')
+  .action((goal: string[]) => runHandler(() => {
     const ask = program.getOptionValue('ask') as boolean;
     const dryRun = program.getOptionValue('dryRun') as boolean;
-    return executeCommand(goal, ask, dryRun);
+    const tui = program.getOptionValue('tui') !== false;
+    return executeCommand(goal.join(' '), ask, dryRun, tui);
+  }, { requiresAI: true, commandName: 'ct execute' }));
+
+program
+  .command('auto', { hidden: true })
+  .description('Compatibility alias for execute')
+  .argument('<goal...>', 'what to build or accomplish')
+  .action((goal: string[]) => runHandler(() => {
+    const ask = program.getOptionValue('ask') as boolean;
+    const dryRun = program.getOptionValue('dryRun') as boolean;
+    const tui = program.getOptionValue('tui') !== false;
+    return executeCommand(goal.join(' '), ask, dryRun, tui);
   }, { requiresAI: true, commandName: 'ct execute' }));
 
 program
@@ -334,11 +380,45 @@ program
   .action(() => runHandler(() => profileCommand()));
 
 program
+  .command('memory')
+  .description('Explore, search, and manage persistent project memory')
+  .argument('[args...]', 'search query or subcommand')
+  .action((args: string[]) => runHandler(() => memoryCommand(...(args || []))));
+
+program
+  .command('analytics')
+  .description('Show autonomous execution analytics and reliability metrics')
+  .action(() => runHandler(() => analyticsCommand()));
+
+program
+  .command('graph')
+  .description('Visualize repository architecture, routes, services, data, and dependencies')
+  .argument('[directory]', 'repository directory')
+  .action((dir?: string) => runHandler(() => graphCommand(dir)));
+
+program
   .command('checkpoint')
   .description('Recovery points — save and restore project state snapshots')
   .argument('[subcommand]', 'list|save|restore')
   .argument('[args...]', 'description or restore ID')
   .action((subcommand?: string, extras?: string[]) => runHandler(() => checkpointCommand(subcommand || '', ...(extras || []))));
+
+program
+  .command('inspect')
+  .description('Inspect the latest or selected execution journal')
+  .argument('[runId]', 'execution run id')
+  .action((runId?: string) => runHandler(() => inspectCommand(runId)));
+
+program
+  .command('sessions')
+  .description('Show the execution session dashboard')
+  .action(() => runHandler(() => inspectCommand()));
+
+program
+  .command('replay')
+  .description('Replay the latest or selected execution journal event timeline')
+  .argument('[runId]', 'execution run id')
+  .action((runId?: string) => runHandler(() => replayCommand(runId)));
 
 program
   .command('onboard')
@@ -406,14 +486,14 @@ program.exitOverride();
   // Launch REPL if no command
   if (process.argv.length < 3) {
     process.stdout.write(showSplash());
-    printHero(
-      providerCheck.ok ? 'Interactive workspace' : 'Setup required',
-      providerCheck.ok
-        ? 'CodeThon is ready. Use slash commands for explicit control or type plain English to talk to the AI.'
-        : 'No working AI provider is configured yet. CodeThon will guide you through setup before opening the REPL.',
-      providerCheck.ok ? 'ready' : 'setup',
-      providerCheck.ok ? 'AI ready' : 'First-run setup',
-    );
+    if (!providerCheck.ok) {
+      printHero(
+        'Setup required',
+        'No working AI provider is configured yet. CodeThon will guide you through setup before opening the OLED workspace.',
+        'setup',
+        'First-run setup',
+      );
+    }
 
     if (!providerCheck.ok && process.stdout.isTTY && process.stdin.isTTY) {
       const setupResult = await onboardCommand(false);
@@ -421,12 +501,6 @@ program.exitOverride();
         console.log('');
         logger.warn('Continuing into the REPL with setup still incomplete.');
       }
-    } else if (providerCheck.ok) {
-      printActionHints('Quick start', [
-        { command: 'status', description: 'Review project, model, and readiness at any time.' },
-        { command: 'plan', description: 'Turn an idea into a roadmap and architecture.' },
-        { command: 'execute "<goal>"', description: 'Give the agent a concrete job to complete.' },
-      ], '/');
     }
 
     const { replCommand } = await import('./commands/repl');
@@ -474,23 +548,23 @@ program.exitOverride();
 
     if (!isKnown && !isAuthSub) {
       console.log('');
-      logger.error(`Unknown command: ${chalk.bold(firstArg)}${process.argv.slice(3).length > 0 ? ' ' + process.argv.slice(3).join(' ') : ''}`);
+      logger.error(`Unknown command: ${chalk.hex('#f7fff9').bold(firstArg)}${process.argv.slice(3).length > 0 ? ' ' + process.argv.slice(3).join(' ') : ''}`);
       console.log('');
-      logger.info(chalk.dim('Did you mean:'));
+      logger.info(chalk.hex('#899691')('Did you mean:'));
       const suggestions = findScopedCommandSuggestions(firstArg, 'cli')
         .slice(0, 5);
       for (const s of suggestions) {
-        logger.info(`  ${chalk.cyanBright(formatCliUsage(s))} ${chalk.dim(s.description)}`);
+        logger.info(`  ${chalk.hex('#74d7ff')(formatCliUsage(s))} ${chalk.hex('#899691')(s.description)}`);
       }
       if (suggestions.length === 0) {
-        logger.info(`  ${chalk.cyanBright('ct help')}`);
-        logger.info(`  ${chalk.cyanBright('ct auth add')}`);
-        logger.info(`  ${chalk.cyanBright('ct init')}`);
-        logger.info(`  ${chalk.cyanBright('ct plan')}`);
-        logger.info(`  ${chalk.cyanBright('ct execute')}`);
+        logger.info(`  ${chalk.hex('#74d7ff')('ct help')}`);
+        logger.info(`  ${chalk.hex('#74d7ff')('ct auth add')}`);
+        logger.info(`  ${chalk.hex('#74d7ff')('ct init')}`);
+        logger.info(`  ${chalk.hex('#74d7ff')('ct plan')}`);
+        logger.info(`  ${chalk.hex('#74d7ff')('ct execute "<goal>"')}`);
       }
       console.log('');
-      logger.info(chalk.dim('Run') + ` ${chalk.cyanBright('ct help')} ${chalk.dim('to see all commands.')}`);
+      logger.info(chalk.hex('#899691')('Run') + ` ${chalk.hex('#74d7ff')('ct help')} ${chalk.hex('#899691')('to see all commands.')}`);
       process.exitCode = 1;
       return;
     }
@@ -501,7 +575,7 @@ program.exitOverride();
     program.parse(process.argv);
   } catch (e: any) {
     if (e.code === 'commander.unknownCommand') {
-      logger.error(`Unknown command. Run ${chalk.cyanBright('ct help')} to see available commands.`);
+      logger.error(`Unknown command. Run ${chalk.hex('#74d7ff')('ct help')} to see available commands.`);
       process.exitCode = 1;
     } else if (e.exitCode === 0) {
       process.exit(0);

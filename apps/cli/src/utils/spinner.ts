@@ -3,7 +3,7 @@ import chalk from 'chalk';
 
 export function createSpinner(text: string) {
   const spinner = ora({
-    text: `${chalk.cyan('\u25C6')}  ${text}`,
+    text: `${chalk.hex('#74d7ff')('\u25C6')}  ${text}`,
     color: 'cyan',
     spinner: {
       interval: 80,
@@ -17,16 +17,16 @@ export function createSpinner(text: string) {
       return spinner;
     },
     succeed: (msg?: string) => {
-      spinner.succeed(chalk.green(`${msg || text}`));
+      spinner.succeed(chalk.hex('#82f7a6')(`${msg || text}`));
     },
     fail: (msg?: string) => {
-      spinner.fail(chalk.red(`${msg || text}`));
+      spinner.fail(chalk.hex('#ff5c7a')(`${msg || text}`));
     },
     info: (msg: string) => {
-      spinner.info(chalk.cyan(msg));
+      spinner.info(chalk.hex('#74d7ff')(msg));
     },
     update: (msg: string) => {
-      spinner.text = `${chalk.cyan('\u25C6')}  ${msg}`;
+      spinner.text = `${chalk.hex('#74d7ff')('\u25C6')}  ${msg}`;
     },
     stop: () => {
       spinner.stop();

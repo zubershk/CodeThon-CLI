@@ -14,6 +14,8 @@ export { learnCommand } from './learn';
 export { statusCommand } from './status';
 export { reviewCommand } from './review';
 export { clearCommand } from './clear';
+export { diffCommand } from './diff';
+export { analyticsCommand } from './analytics';
 export { analyzeCommand } from './analyze';
 export { buildCommand } from './build';
 export { autofixCommand } from './autofix';
@@ -29,6 +31,9 @@ export { gitCommand } from './git';
 export { testGenCommand } from './test-gen';
 export { profileCommand } from './profile';
 export { checkpointCommand } from './checkpoint';
+export { inspectCommand, replayCommand } from './journal';
+export { graphCommand } from './graph';
+export { memoryCommand } from './memory';
 export { onboardCommand } from './onboard';
 export {
   authAddCommand,

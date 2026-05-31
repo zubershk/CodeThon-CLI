@@ -150,7 +150,7 @@ Write-Host "     Bundle: $size bytes"
 if ($size -gt 100kb -and $size -lt 2mb) { Ok "Build: bundle size" } else { Skip "Build: size" "${size}bytes" }
 
 $versionOut = & $NODE $CLI --version 2>&1 | Out-String
-if ($versionOut -match '0\.1\.0') { Ok "Build: version string" } else { No "Build: version" "got '$versionOut'" }
+if ($versionOut -match '1\.1\.0') { Ok "Build: version string" } else { No "Build: version" "got '$versionOut'" }
 
 # ── Results ─────────────────────────────────────────────
 Write-Host ""

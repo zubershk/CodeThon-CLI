@@ -15,7 +15,7 @@ export async function summarizeCommand(): Promise<CommandResult> {
   const llm = getLLMConfig();
 
   if (!project) {
-    logger.error('No active project. Run `ct init` first.');
+    logger.error('No active project. Run `/init` inside ct, or `ct init` from your shell.');
     return { success: false, message: 'No active project' };
   }
 
@@ -88,7 +88,7 @@ Use markdown. Be direct — no fluff. Under 300 words.`,
     // Also show key metrics inline
     logger.labelValue('Phase', project.sprintPhase || 'N/A');
     logger.labelValue('MVP Completion', hs ? `${hs.mvpCompletion}/100` : 'N/A');
-    const blockerStr = blockers.length > 0 ? chalk.redBright(`${blockers.length} active`) : 'None';
+    const blockerStr = blockers.length > 0 ? chalk.hex('#ff5c7a')(`${blockers.length} active`) : 'None';
     logger.labelValue('Blockers', blockerStr);
     logger.labelValue('Debug Sessions', `${resolvedDebug}/${debugCount} resolved`);
     logger.labelValue('Outputs Generated', `${outputs}`);

@@ -89,7 +89,7 @@ export async function initCommand(): Promise<CommandResult> {
   logger.divider();
 
   const allStackChoices = TECH_STACK_CATALOG.flatMap((cat) => [
-    { separator: chalk.cyan(`── ${cat.category} ──`) },
+    { separator: chalk.hex('#74d7ff')(`── ${cat.category} ──`) },
     ...cat.items.map((item) => ({ name: `  ${item}`, value: item, checked: false })),
   ]);
 
@@ -141,11 +141,11 @@ export async function initCommand(): Promise<CommandResult> {
   logger.info('');
   logger.highlight('Recommended next steps:');
   logger.info('');
-  logger.commandBlock('ct plan "<your feature>"');
+  logger.commandBlock('/plan "<your feature>"');
   logger.muted('   \u2514\u2500 Generate roadmap + architecture in one command');
-  logger.commandBlock('ct scaffold');
+  logger.commandBlock('/scaffold');
   logger.muted('   \u2514\u2500 Generate starter project files');
-  logger.commandBlock('ct execute "<goal>"');
+  logger.commandBlock('/execute "<goal>"');
   logger.muted('   \u2514\u2500 Start building with the autonomous agent');
 
   return {

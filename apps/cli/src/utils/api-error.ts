@@ -48,7 +48,7 @@ export function formatApiError(error: unknown, providerName?: string): string {
   if (isQuota) {
     lines.push(`\u26A0  ${display} quota exceeded.`);
     lines.push(``, `  Check your billing at: ${setup.url}`);
-    lines.push(`  Or switch to a different provider with: ct model`);
+    lines.push(`  Or switch to a different provider with: /model inside ct, or ct model from your shell`);
   } else {
     lines.push(`No valid API key for ${display}.`);
   }
@@ -69,7 +69,7 @@ export function formatApiError(error: unknown, providerName?: string): string {
       const keyPart = info.envVar ? `  ${info.envVar}=<your-key>` : '  (local, no key needed)';
       lines.push(`    \u2022 ${getDisplayName(pname)}`);
       lines.push(`      ${keyPart}`);
-      lines.push(`      Run: ct model  (select ${pname})`);
+      lines.push(`      Run: /model inside ct, or ct model from your shell  (select ${pname})`);
     }
   }
 
@@ -77,5 +77,5 @@ export function formatApiError(error: unknown, providerName?: string): string {
 }
 
 export function friendlyAgentError(error: unknown): string {
-  return `\u26A0  AI service unavailable.\n\n${formatApiError(error)}\n\n  Or run: ct doctor  (system diagnostics without AI)`;
+  return `\u26A0  AI service unavailable.\n\n${formatApiError(error)}\n\n  Or run: /doctor inside ct, or ct doctor from your shell`;
 }

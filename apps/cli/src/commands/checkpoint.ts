@@ -15,14 +15,14 @@ export async function checkpointCommand(...args: string[]): Promise<CommandResul
       ['restore', '<id>    Restore files from a recovery point'],
     ];
     for (let i = 0; i < cmds.length; i++) {
-      logger.info(`  ${chalk.cyanBright(`[${i + 1}]`)} ${chalk.whiteBright(cmds[i][0].padEnd(9))} ${chalk.dim(cmds[i][1])}`);
+      logger.info(`  ${chalk.hex('#74d7ff')(`[${i + 1}]`)} ${chalk.hex('#f7fff9')(cmds[i][0].padEnd(9))} ${chalk.hex('#899691')(cmds[i][1])}`);
     }
     console.log('');
-    logger.info(chalk.dim('  Type /checkpoint <number> or /checkpoint <name>, e.g. /checkpoint 1 or /checkpoint list'));
+    logger.info(chalk.hex('#899691')('  Type /checkpoint <number> or /checkpoint <name>, e.g. /checkpoint 1 or /checkpoint list'));
     return { success: true, message: 'Checkpoint commands listed' };
   }
 
-  // Number alias: /checkpoint 1 → list
+  // Number alias: /checkpoint 1 -> list
   const numIndex = parseInt(sub, 10);
   const numMap = ['list', 'save', 'restore'];
   if (!isNaN(numIndex) && numIndex >= 1 && numIndex <= numMap.length) {
@@ -32,10 +32,10 @@ export async function checkpointCommand(...args: string[]): Promise<CommandResul
   if (sub === 'list') {
     const history = recovery.getHistory();
     logger.section('Recovery Points');
-    if (history.length === 0) { logger.info(chalk.dim('No recovery points found. Use /checkpoint save to create one.')); return { success: true, message: 'No points' }; }
+    if (history.length === 0) { logger.info(chalk.hex('#899691')('No recovery points found. Use /checkpoint save to create one.')); return { success: true, message: 'No points' }; }
     for (const h of history) {
       const date = new Date(h.timestamp).toLocaleString();
-      logger.info(`  ${chalk.cyanBright(h.id)}  ${chalk.dim(date)}  ${h.description}`);
+      logger.info(`  ${chalk.hex('#74d7ff')(h.id)}  ${chalk.hex('#899691')(date)}  ${h.description}`);
     }
     return { success: true, message: `${history.length} point(s)` };
   }
@@ -44,7 +44,7 @@ export async function checkpointCommand(...args: string[]): Promise<CommandResul
     const desc = args.slice(1).join(' ') || `Checkpoint ${Date.now()}`;
     logger.highlight('Capturing recovery point...');
     const id = await recovery.capturePoint(desc);
-    logger.success(`Saved: ${chalk.cyanBright(id)} — ${desc}`);
+    logger.success(`Saved: ${chalk.hex('#74d7ff')(id)} — ${desc}`);
     return { success: true, message: `Saved ${id}` };
   }
 

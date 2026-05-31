@@ -49,7 +49,7 @@ function spawnSafe(bin: string, args: string[], opts: { timeout?: number; cwd?: 
 
 async function vercelDeploy(): Promise<DeployResult> {
   const projectDir = findProjectRoot();
-  logger.info(`Project root: ${chalk.cyan(projectDir)}`);
+  logger.info(`Project root: ${chalk.hex('#74d7ff')(projectDir)}`);
 
   // Check if Vercel CLI is available
   let vercelCheck = null;
@@ -170,14 +170,14 @@ export async function deployCommand(): Promise<CommandResult> {
         logger.error(`AI service error: ${errMsg}`);
       }
       logger.info('');
-      logger.info(chalk.bold.cyan('  No AI? Here are recommended platforms:'));
+      logger.info(chalk.hex('#74d7ff').bold('  No AI? Here are recommended platforms:'));
       logger.info('');
-      logger.info(`  ${chalk.dim('Next.js')}    ${chalk.green('→')}  Vercel (zero-config)`);
-      logger.info(`  ${chalk.dim('Vite/React')}  ${chalk.green('→')}  Vercel or Netlify`);
-      logger.info(`  ${chalk.dim('Express')}    ${chalk.green('→')}  Railway or Render`);
-      logger.info(`  ${chalk.dim('FastAPI')}    ${chalk.green('→')}  Railway or Render`);
+      logger.info(`  ${chalk.hex('#899691')('Next.js')}    ${chalk.hex('#82f7a6')('->')}  Vercel (zero-config)`);
+      logger.info(`  ${chalk.hex('#899691')('Vite/React')}  ${chalk.hex('#82f7a6')('->')}  Vercel or Netlify`);
+      logger.info(`  ${chalk.hex('#899691')('Express')}    ${chalk.hex('#82f7a6')('->')}  Railway or Render`);
+      logger.info(`  ${chalk.hex('#899691')('FastAPI')}    ${chalk.hex('#82f7a6')('->')}  Railway or Render`);
       logger.info('');
-      logger.info(`  ${chalk.yellow('⚠')}  AI guide generation failed. Run ${chalk.cyan('ct deploy')} and choose "Deploy to Vercel" to deploy automatically.`);
+      logger.info(`  ${chalk.hex('#ffcf5c')('▲')}  AI guide generation failed. Run ${chalk.hex('#74d7ff')('ct deploy')} and choose "Deploy to Vercel" to deploy automatically.`);
       return { success: false, message: 'Deployment guide (fallback)' };
     }
   }
@@ -196,7 +196,7 @@ export async function deployCommand(): Promise<CommandResult> {
   }
 
   if (!project) {
-    logger.warn('No active project. Run `ct init` first to set up project tracking.');
+    logger.warn('No active project. Run `/init` inside ct, or `ct init` from your shell to set up project tracking.');
     const proceed = await promptConfirm({
       message: 'Continue without project tracking?',
       defaultValue: true,

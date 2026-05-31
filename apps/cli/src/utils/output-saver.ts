@@ -76,14 +76,14 @@ export function listSavedOutputs(): { type: OutputType; files: string[] }[] {
 export function printSavedOutputsSummary(): void {
   const outputs = listSavedOutputs();
   if (outputs.length === 0) {
-    console.log(`  ${chalk.dim('No saved outputs in .codethon/')}`);
+    console.log(`  ${chalk.hex('#899691')('No saved outputs in .codethon/')}`);
     return;
   }
-  console.log(`  ${chalk.bold.whiteBright('Saved Outputs')}`);
+  console.log(`  ${chalk.hex('#f7fff9').bold('Saved Outputs')}`);
   for (const { type, files } of outputs) {
-    console.log(`  ${chalk.cyanBright('\u25B8')} ${chalk.whiteBright(type)}/`);
+    console.log(`  ${chalk.hex('#74d7ff')('\u25B8')} ${chalk.hex('#f7fff9')(type)}/`);
     for (const f of files) {
-      console.log(`    ${chalk.gray('\u2514\u2500')} ${chalk.dim(f)}`);
+      console.log(`    ${chalk.hex('#899691')('\u2514\u2500')} ${chalk.hex('#899691')(f)}`);
     }
   }
 }

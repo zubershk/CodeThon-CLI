@@ -18,14 +18,14 @@ export async function gitCommand(...args: string[]): Promise<CommandResult> {
       ['branch', 'Suggest a branch name for changes'],
     ];
     for (let i = 0; i < cmds.length; i++) {
-      logger.info(`  ${chalk.cyanBright(`[${i + 1}]`)} ${chalk.whiteBright(cmds[i][0].padEnd(9))} ${chalk.dim(cmds[i][1])}`);
+      logger.info(`  ${chalk.hex('#74d7ff')(`[${i + 1}]`)} ${chalk.hex('#f7fff9')(cmds[i][0].padEnd(9))} ${chalk.hex('#899691')(cmds[i][1])}`);
     }
     console.log('');
-    logger.info(chalk.dim('  Type /git <number> or /git <name>, e.g. /git 1 or /git status'));
+    logger.info(chalk.hex('#899691')('  Type /git <number> or /git <name>, e.g. /git 1 or /git status'));
     return { success: true, message: 'Git commands listed' };
   }
 
-  // Number alias: /git 1 → status
+  // Number alias: /git 1 -> status
   const numIndex = parseInt(sub, 10);
   const numMap = ['status', 'diff', 'suggest', 'review', 'pr', 'branch'];
   if (!isNaN(numIndex) && numIndex >= 1 && numIndex <= numMap.length) {
@@ -37,15 +37,15 @@ export async function gitCommand(...args: string[]): Promise<CommandResult> {
     const commits = git.getRecentCommits(5);
     logger.section('Git Status');
     if (files.length > 0) {
-      logger.info(`${chalk.yellowBright(`${files.length}`)} changed file(s):`);
-      for (const f of files) logger.info(`  ${chalk.dim(f)}`);
+      logger.info(`${chalk.hex('#ffcf5c')(`${files.length}`)} changed file(s):`);
+      for (const f of files) logger.info(`  ${chalk.hex('#899691')(f)}`);
     } else {
-      logger.info(chalk.dim('No changes'));
+      logger.info(chalk.hex('#899691')('No changes'));
     }
     logger.info('');
-    logger.info(chalk.dim('Recent commits:'));
+    logger.info(chalk.hex('#899691')('Recent commits:'));
     for (const c of commits.split('\n').filter(Boolean)) {
-      logger.info(`  ${chalk.dim(c)}`);
+      logger.info(`  ${chalk.hex('#899691')(c)}`);
     }
     return { success: true, message: 'Git status displayed' };
   }
@@ -54,7 +54,7 @@ export async function gitCommand(...args: string[]): Promise<CommandResult> {
     const diff = git.getDiff();
     if (!diff) { logger.warn('No changes to show'); return { success: true, message: 'No diff' }; }
     console.log(diff.slice(0, 5000));
-    if (diff.length > 5000) logger.info(chalk.dim(`... (${diff.length - 5000} more chars)`));
+    if (diff.length > 5000) logger.info(chalk.hex('#899691')(`... (${diff.length - 5000} more chars)`));
     return { success: true, message: 'Diff displayed' };
   }
 
@@ -62,21 +62,21 @@ export async function gitCommand(...args: string[]): Promise<CommandResult> {
     logger.highlight('Analyzing changes...');
     const suggestion = await git.generateCommitMessage();
     console.log('');
-    logger.info(`${chalk.bold('Suggested commit:')}`);
-    logger.info(`  ${chalk.cyanBright(suggestion.type)}${suggestion.scope ? chalk.dim(`(${suggestion.scope})`) : ''}: ${suggestion.description}`);
-    logger.info(`  ${chalk.dim(suggestion.message)}`);
+    logger.info(`${chalk.hex('#f7fff9').bold('Suggested commit:')}`);
+    logger.info(`  ${chalk.hex('#74d7ff')(suggestion.type)}${suggestion.scope ? chalk.hex('#899691')(`(${suggestion.scope})`) : ''}: ${suggestion.description}`);
+    logger.info(`  ${chalk.hex('#899691')(suggestion.message)}`);
     return { success: true, message: suggestion.message, data: suggestion as any };
   }
 
   if (sub === 'review') {
     logger.highlight('Reviewing code...');
     const comments = await git.reviewCode();
-    if (comments.length === 0) { logger.info(chalk.greenBright('No issues found.')); return { success: true, message: 'No issues' }; }
+    if (comments.length === 0) { logger.info(chalk.hex('#82f7a6')('No issues found.')); return { success: true, message: 'No issues' }; }
     logger.section('Code Review');
     for (const c of comments) {
-      const icon = c.severity === 'error' ? chalk.redBright('\u2717') : c.severity === 'warning' ? chalk.yellowBright('\u26A0') : chalk.blueBright('\u2139');
-      logger.info(`  ${icon} ${chalk.dim(c.file)}:${c.line} ${c.message}`);
-      if (c.suggestion) logger.info(`    ${chalk.dim('Fix:')} ${c.suggestion}`);
+      const icon = c.severity === 'error' ? chalk.hex('#ff5c7a')('\u2717') : c.severity === 'warning' ? chalk.hex('#ffcf5c')('\u26A0') : chalk.hex('#7aa7ff')('\u2139');
+      logger.info(`  ${icon} ${chalk.hex('#899691')(c.file)}:${c.line} ${c.message}`);
+      if (c.suggestion) logger.info(`    ${chalk.hex('#899691')('Fix:')} ${c.suggestion}`);
     }
     return { success: true, message: `${comments.length} review comment(s)` };
   }
@@ -90,7 +90,7 @@ export async function gitCommand(...args: string[]): Promise<CommandResult> {
 
   if (sub === 'branch') {
     const name = await git.suggestBranchName();
-    logger.info(`Suggested branch: ${chalk.cyanBright(name)}`);
+    logger.info(`Suggested branch: ${chalk.hex('#74d7ff')(name)}`);
     return { success: true, message: name };
   }
 

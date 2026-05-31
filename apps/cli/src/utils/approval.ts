@@ -11,20 +11,20 @@ export interface ApprovalRequest {
 }
 
 export async function requireApproval(request: ApprovalRequest): Promise<boolean> {
-  const border = chalk.bold.yellowBright('\u2500'.repeat(54));
+  const border = chalk.hex('#ffcf5c').bold('\u2500'.repeat(54));
 
   console.log(`\n  ${border}`);
-  console.log(`  ${chalk.bold.yellowBright('\u26A0')}  ${chalk.bold.whiteBright('APPROVAL REQUIRED')}`);
+  console.log(`  ${chalk.hex('#ffcf5c').bold('\u26A0')}  ${chalk.hex('#f7fff9').bold('APPROVAL REQUIRED')}`);
   console.log(`  ${border}`);
 
-  const riskColor = request.risk === 'high' ? chalk.bgRed.white.bold :
-                    request.risk === 'medium' ? chalk.bgYellow.black.bold :
-                    chalk.bgGreen.black.bold;
+  const riskColor = request.risk === 'high' ? chalk.bgHex('#ff5c7a').hex('#fff7fa').bold :
+                    request.risk === 'medium' ? chalk.bgHex('#ffcf5c').hex('#100b00').bold :
+                    chalk.bgHex('#82f7a6').hex('#00110b').bold;
 
-  console.log(`  ${chalk.dim('\u2502')}  ${chalk.bold.whiteBright('Action:')} ${chalk.whiteBright(request.description)}`);
-  console.log(`  ${chalk.dim('\u2502')}  ${chalk.bold.whiteBright('Risk:')}   ${riskColor(` ${request.risk.toUpperCase()} `)}`);
-  console.log(`  ${chalk.dim('\u2502')}`);
-  console.log(`  ${chalk.dim('\u2502')}  ${request.details.replace(/\n/g, '\n  ' + chalk.dim('\u2502') + '  ')}`);
+  console.log(`  ${chalk.hex('#899691')('\u2502')}  ${chalk.hex('#f7fff9').bold('Action:')} ${chalk.hex('#f7fff9')(request.description)}`);
+  console.log(`  ${chalk.hex('#899691')('\u2502')}  ${chalk.hex('#f7fff9').bold('Risk:')}   ${riskColor(` ${request.risk.toUpperCase()} `)}`);
+  console.log(`  ${chalk.hex('#899691')('\u2502')}`);
+  console.log(`  ${chalk.hex('#899691')('\u2502')}  ${request.details.replace(/\n/g, '\n  ' + chalk.hex('#899691')('\u2502') + '  ')}`);
   console.log(`  ${border}`);
 
   return askYesNo('  Proceed?');
@@ -37,7 +37,7 @@ export async function askYesNo(prompt: string): Promise<boolean> {
   });
 
   return new Promise((resolve) => {
-    rl.question(`${prompt} ${chalk.dim('(y/N)')} `, (answer) => {
+    rl.question(`${prompt} ${chalk.hex('#899691')('(y/N)')} `, (answer) => {
       rl.close();
       resolve(answer.toLowerCase() === 'y' || answer.toLowerCase() === 'yes');
     });
@@ -66,10 +66,10 @@ export async function showDiffAndApprove(filePath: string, newContent: string): 
     if (oldLines[i] !== newLines[i]) {
       if (diffLines.length < maxDiff) {
         if (oldLines[i] !== undefined) {
-          diffLines.push(`  ${chalk.redBright('- ' + oldLines[i])}`);
+          diffLines.push(`  ${chalk.hex('#ff5c7a')('- ' + oldLines[i])}`);
         }
         if (newLines[i] !== undefined) {
-          diffLines.push(`  ${chalk.greenBright('+ ' + newLines[i])}`);
+          diffLines.push(`  ${chalk.hex('#82f7a6')('+ ' + newLines[i])}`);
         }
       }
       changes++;

@@ -8,11 +8,11 @@ type Finding = PerformanceFinding | CodeSmellFinding;
 
 function severityColor(severity: Finding['severity']): (value: string) => string {
   switch (severity) {
-    case 'critical': return chalk.redBright;
-    case 'high': return chalk.yellowBright;
-    case 'medium': return chalk.blueBright;
-    case 'low': return chalk.gray;
-    default: return chalk.dim;
+    case 'critical': return chalk.hex('#ff5c7a');
+    case 'high': return chalk.hex('#ffcf5c');
+    case 'medium': return chalk.hex('#7aa7ff');
+    case 'low': return chalk.hex('#899691');
+    default: return chalk.hex('#899691');
   }
 }
 
@@ -25,15 +25,15 @@ function printProfileRunPanel(root: string): void {
     ['Scope', 'monorepo-aware scan of src/app/pages/components/lib/server/apps/packages/services/libs'],
   ];
 
-  console.log(`  ${chalk.cyan('┌')}${chalk.cyan('─'.repeat(width - 2))}${chalk.cyan('┐')}`);
-  console.log(`  ${chalk.cyan('│')} ${chalk.bold.whiteBright('Profile run'.padEnd(inner))} ${chalk.cyan('│')}`);
-  console.log(`  ${chalk.cyan('├')}${chalk.cyan('─'.repeat(width - 2))}${chalk.cyan('┤')}`);
+  console.log(`  ${chalk.hex('#74d7ff')('┌')}${chalk.hex('#74d7ff')('─'.repeat(width - 2))}${chalk.hex('#74d7ff')('┐')}`);
+  console.log(`  ${chalk.hex('#74d7ff')('│')} ${chalk.hex('#f7fff9').bold('Profile run'.padEnd(inner))} ${chalk.hex('#74d7ff')('│')}`);
+  console.log(`  ${chalk.hex('#74d7ff')('├')}${chalk.hex('#74d7ff')('─'.repeat(width - 2))}${chalk.hex('#74d7ff')('┤')}`);
   for (const [label, value] of rows) {
     const text = `${`${label}:`.padEnd(10)} ${value}`;
     const clipped = text.length > inner ? `${text.slice(0, inner - 1)}…` : text.padEnd(inner);
-    console.log(`  ${chalk.cyan('│')} ${chalk.dim(clipped)} ${chalk.cyan('│')}`);
+    console.log(`  ${chalk.hex('#74d7ff')('│')} ${chalk.hex('#899691')(clipped)} ${chalk.hex('#74d7ff')('│')}`);
   }
-  console.log(`  ${chalk.cyan('└')}${chalk.cyan('─'.repeat(width - 2))}${chalk.cyan('┘')}`);
+  console.log(`  ${chalk.hex('#74d7ff')('└')}${chalk.hex('#74d7ff')('─'.repeat(width - 2))}${chalk.hex('#74d7ff')('┘')}`);
   console.log('');
 }
 
@@ -48,11 +48,11 @@ function printSeveritySummary(findings: Finding[]): void {
 
   logger.labelValue('Findings', String(findings.length));
   console.log(
-    `  ${chalk.redBright(`${counts.critical} critical`)}  ` +
-    `${chalk.yellowBright(`${counts.high} high`)}  ` +
-    `${chalk.blueBright(`${counts.medium} medium`)}  ` +
-    `${chalk.gray(`${counts.low} low`)}  ` +
-    `${chalk.dim(`${counts.info} info`)}`
+    `  ${chalk.hex('#ff5c7a')(`${counts.critical} critical`)}  ` +
+    `${chalk.hex('#ffcf5c')(`${counts.high} high`)}  ` +
+    `${chalk.hex('#7aa7ff')(`${counts.medium} medium`)}  ` +
+    `${chalk.hex('#899691')(`${counts.low} low`)}  ` +
+    `${chalk.hex('#899691')(`${counts.info} info`)}`
   );
   logger.divider();
 }
@@ -74,17 +74,17 @@ function printFindings(findings: Finding[]): void {
 
   logger.subsection(full ? 'Findings' : 'Top Findings');
   for (const [file, fileFindings] of byFile) {
-    console.log(`  ${chalk.bold.cyanBright(file)}`);
+    console.log(`  ${chalk.hex('#74d7ff').bold(file)}`);
     for (const finding of fileFindings) {
       const color = severityColor(finding.severity);
-      const location = 'line' in finding && finding.line ? chalk.dim(`:${finding.line}`) : '';
-      console.log(`  ${chalk.dim('│')} ${color(finding.severity.toUpperCase().padEnd(8))} ${chalk.whiteBright(finding.category)}${location}`);
-      console.log(`  ${chalk.dim('│')}   ${finding.message}`);
+      const location = 'line' in finding && finding.line ? chalk.hex('#899691')(`:${finding.line}`) : '';
+      console.log(`  ${chalk.hex('#899691')('│')} ${color(finding.severity.toUpperCase().padEnd(8))} ${chalk.hex('#f7fff9')(finding.category)}${location}`);
+      console.log(`  ${chalk.hex('#899691')('│')}   ${finding.message}`);
       if ('suggestion' in finding && finding.suggestion) {
-        console.log(`  ${chalk.dim('│')}   ${chalk.greenBright('Fix:')} ${chalk.dim(finding.suggestion)}`);
+        console.log(`  ${chalk.hex('#899691')('│')}   ${chalk.hex('#82f7a6')('Fix:')} ${chalk.hex('#899691')(finding.suggestion)}`);
       }
       if ('metric' in finding && finding.metric) {
-        console.log(`  ${chalk.dim('│')}   ${chalk.dim(`Metric: ${finding.metric.value} / threshold ${finding.metric.threshold}`)}`);
+        console.log(`  ${chalk.hex('#899691')('│')}   ${chalk.hex('#899691')(`Metric: ${finding.metric.value} / threshold ${finding.metric.threshold}`)}`);
       }
     }
     console.log('');

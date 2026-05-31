@@ -40,12 +40,12 @@ function plainMarkdown(text: string): string {
 
 function renderInline(text: string): string {
   let result = text;
-  result = result.replace(/\*\*(.+?)\*\*/g, (_, c) => chalk.bold.whiteBright(c));
-  result = result.replace(/__(.+?)__/g, (_, c) => chalk.bold.whiteBright(c));
-  result = result.replace(/`([^`]+)`/g, (_, c) => chalk.cyanBright(c));
-  result = result.replace(/\[([^\]]+)\]\([^)]+\)/g, (_, t) => chalk.underline.cyanBright(t));
-  result = result.replace(/~~(.+?)~~/g, (_, c) => chalk.strikethrough.gray(c));
-  result = result.replace(/\*(.+?)\*/g, (_, c) => chalk.italic(c));
+  result = result.replace(/\*\*(.+?)\*\*/g, (_, c) => chalk.hex('#f7fff9').bold(c));
+  result = result.replace(/__(.+?)__/g, (_, c) => chalk.hex('#f7fff9').bold(c));
+  result = result.replace(/`([^`]+)`/g, (_, c) => chalk.hex('#74d7ff')(c));
+  result = result.replace(/\[([^\]]+)\]\([^)]+\)/g, (_, t) => chalk.hex('#74d7ff').underline(t));
+  result = result.replace(/~~(.+?)~~/g, (_, c) => chalk.hex('#899691').strikethrough(c));
+  result = result.replace(/\*(.+?)\*/g, (_, c) => chalk.hex('#e0e6e1').italic(c));
   return result;
 }
 
@@ -55,7 +55,7 @@ function printWrapped(text: string, options: {
   continuationPrefix?: string;
   color?: ColorFn;
 }): void {
-  const prefix = options.prefix ?? `  ${chalk.dim('│')} `;
+  const prefix = options.prefix ?? `  ${chalk.hex('#899691')('│')} `;
   const continuationPrefix = options.continuationPrefix ?? prefix;
   const firstPrefixWidth = stripAnsi(prefix).length;
   const contPrefixWidth = stripAnsi(continuationPrefix).length;
@@ -75,7 +75,7 @@ function printWrapped(text: string, options: {
 function printParagraph(lines: string[], width: number): void {
   const text = lines.map(line => line.trim()).join(' ').replace(/\s+/g, ' ').trim();
   if (!text) return;
-  printWrapped(text, { width, color: chalk.whiteBright });
+  printWrapped(text, { width, color: chalk.hex('#f7fff9') });
 }
 
 function printHeading(raw: string, level: number, width: number): void {
@@ -83,25 +83,25 @@ function printHeading(raw: string, level: number, width: number): void {
   if (!title) return;
 
   if (level <= 1) {
-    const line = chalk.cyanBright('─'.repeat(Math.min(width, Math.max(44, title.length + 8))));
+    const line = chalk.hex('#74d7ff')('─'.repeat(Math.min(width, Math.max(44, title.length + 8))));
     console.log('');
-    console.log(`  ${chalk.bold.cyanBright('◆')} ${chalk.bold.whiteBright(title)}`);
+    console.log(`  ${chalk.hex('#74d7ff').bold('*')} ${chalk.hex('#f7fff9').bold(title)}`);
     console.log(`  ${line}`);
     return;
   }
 
   if (level === 2) {
     console.log('');
-    console.log(`  ${chalk.bold.magentaBright('▸')} ${chalk.bold.whiteBright(title)}`);
+    console.log(`  ${chalk.hex('#d7a3ff').bold('>')} ${chalk.hex('#f7fff9').bold(title)}`);
     return;
   }
 
   console.log('');
-  console.log(`  ${chalk.cyanBright('•')} ${chalk.bold.whiteBright(title)}`);
+  console.log(`  ${chalk.hex('#74d7ff')('*')} ${chalk.hex('#f7fff9').bold(title)}`);
 }
 
 function printRule(width: number): void {
-  console.log(`  ${chalk.dim('─'.repeat(Math.min(width, 72)))}`);
+  console.log(`  ${chalk.hex('#899691')('─'.repeat(Math.min(width, 72)))}`);
 }
 
 function printListItem(raw: string, width: number): void {
@@ -110,9 +110,9 @@ function printListItem(raw: string, width: number): void {
   if (unordered) {
     printWrapped(unordered[1], {
       width,
-      prefix: `  ${chalk.dim('│')} ${chalk.cyanBright('•')} `,
-      continuationPrefix: `  ${chalk.dim('│')}   `,
-      color: chalk.whiteBright,
+      prefix: `  ${chalk.hex('#899691')('│')} ${chalk.hex('#74d7ff')('*')} `,
+      continuationPrefix: `  ${chalk.hex('#899691')('│')}   `,
+      color: chalk.hex('#f7fff9'),
     });
     return;
   }
@@ -122,9 +122,9 @@ function printListItem(raw: string, width: number): void {
     const marker = `${ordered[1]}.`;
     printWrapped(ordered[2], {
       width,
-      prefix: `  ${chalk.dim('│')} ${chalk.cyanBright(marker.padStart(3, ' '))} `,
-      continuationPrefix: `  ${chalk.dim('│')}     `,
-      color: chalk.whiteBright,
+      prefix: `  ${chalk.hex('#899691')('│')} ${chalk.hex('#74d7ff')(marker.padStart(3, ' '))} `,
+      continuationPrefix: `  ${chalk.hex('#899691')('│')}     `,
+      color: chalk.hex('#f7fff9'),
     });
   }
 }
@@ -133,34 +133,34 @@ function printQuote(raw: string, width: number): void {
   const text = raw.replace(/^>\s?/, '').trim();
   printWrapped(text, {
     width,
-    prefix: `  ${chalk.dim('┃')} `,
-    continuationPrefix: `  ${chalk.dim('┃')} `,
-    color: chalk.gray,
+    prefix: `  ${chalk.hex('#899691')('┃')} `,
+    continuationPrefix: `  ${chalk.hex('#899691')('┃')} `,
+    color: chalk.hex('#899691'),
   });
 }
 
 function printCodeBlock(lines: string[], lang: string, width: number): void {
-  const label = lang ? chalk.bold.cyanBright(lang) : chalk.bold.cyanBright('code');
+  const label = lang ? chalk.hex('#74d7ff').bold(lang) : chalk.hex('#74d7ff').bold('code');
   const boxWidth = Math.min(width, Math.max(44, Math.min(96, width)));
   const innerWidth = Math.max(20, boxWidth - 4);
   console.log('');
-  console.log(`  ${chalk.cyan('┌')} ${label} ${chalk.cyan('─'.repeat(Math.max(2, innerWidth - stripAnsi(label).length - 1)))}`);
+  console.log(`  ${chalk.hex('#74d7ff')('┌')} ${label} ${chalk.hex('#74d7ff')('─'.repeat(Math.max(2, innerWidth - stripAnsi(label).length - 1)))}`);
   for (const raw of lines) {
     const line = raw.replace(/\t/g, '  ');
     const wrapped = line.length > innerWidth ? [truncateText(line, innerWidth)] : [line];
     for (const part of wrapped) {
-      console.log(`  ${chalk.cyan('│')} ${chalk.whiteBright(part)}`);
+      console.log(`  ${chalk.hex('#74d7ff')('│')} ${chalk.hex('#f7fff9')(part)}`);
     }
   }
-  console.log(`  ${chalk.cyan('└')}${chalk.cyan('─'.repeat(innerWidth + 2))}`);
+  console.log(`  ${chalk.hex('#74d7ff')('└')}${chalk.hex('#74d7ff')('─'.repeat(innerWidth + 2))}`);
 }
 
 function printCodeBlockStart(lang: string, width: number): { innerWidth: number } {
-  const label = lang ? chalk.bold.cyanBright(lang) : chalk.bold.cyanBright('code');
+  const label = lang ? chalk.hex('#74d7ff').bold(lang) : chalk.hex('#74d7ff').bold('code');
   const boxWidth = Math.min(width, Math.max(44, Math.min(96, width)));
   const innerWidth = Math.max(20, boxWidth - 4);
   console.log('');
-  console.log(`  ${chalk.cyan('┌')} ${label} ${chalk.cyan('─'.repeat(Math.max(2, innerWidth - stripAnsi(label).length - 1)))}`);
+  console.log(`  ${chalk.hex('#74d7ff')('┌')} ${label} ${chalk.hex('#74d7ff')('─'.repeat(Math.max(2, innerWidth - stripAnsi(label).length - 1)))}`);
   return { innerWidth };
 }
 
@@ -168,12 +168,12 @@ function printCodeBlockLine(raw: string, innerWidth: number): void {
   const line = raw.replace(/\t/g, '  ');
   const wrapped = line.length > innerWidth ? [truncateText(line, innerWidth)] : [line];
   for (const part of wrapped) {
-    console.log(`  ${chalk.cyan('│')} ${chalk.whiteBright(part)}`);
+    console.log(`  ${chalk.hex('#74d7ff')('│')} ${chalk.hex('#f7fff9')(part)}`);
   }
 }
 
 function printCodeBlockEnd(innerWidth: number): void {
-  console.log(`  ${chalk.cyan('└')}${chalk.cyan('─'.repeat(innerWidth + 2))}`);
+  console.log(`  ${chalk.hex('#74d7ff')('└')}${chalk.hex('#74d7ff')('─'.repeat(innerWidth + 2))}`);
 }
 
 function renderCompletedMarkdownLine(raw: string, width: number, streamState: {
@@ -232,7 +232,7 @@ function renderCompletedMarkdownLine(raw: string, width: number, streamState: {
     return;
   }
 
-  printWrapped(trimmed, { width, color: chalk.whiteBright });
+  printWrapped(trimmed, { width, color: chalk.hex('#f7fff9') });
 }
 
 export function createMarkdownStreamRenderer(options: RenderOptions = {}): MarkdownStreamRenderer {
@@ -368,16 +368,16 @@ export function renderAgentOutput(content: string, options: RenderOptions = {}):
 
 export function resultSummary(title: string, items: string[]): void {
   const width = terminalWidth();
-  const line = chalk.bold.greenBright('─'.repeat(Math.min(width, 72)));
+  const line = chalk.hex('#82f7a6').bold('─'.repeat(Math.min(width, 72)));
   console.log('');
-  console.log(`  ${chalk.bold.greenBright('◆')}  ${chalk.bold.whiteBright(title)}`);
+  console.log(`  ${chalk.hex('#82f7a6').bold('*')}  ${chalk.hex('#f7fff9').bold(title)}`);
   console.log(`  ${line}`);
   for (const item of items) {
     printWrapped(item, {
       width,
-      prefix: `  ${chalk.dim('│')} ${chalk.cyanBright('•')} `,
-      continuationPrefix: `  ${chalk.dim('│')}   `,
-      color: chalk.whiteBright,
+      prefix: `  ${chalk.hex('#899691')('│')} ${chalk.hex('#74d7ff')('*')} `,
+      continuationPrefix: `  ${chalk.hex('#899691')('│')}   `,
+      color: chalk.hex('#f7fff9'),
     });
   }
   console.log(`  ${line}`);

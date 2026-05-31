@@ -1,4 +1,5 @@
 import { theme } from '../ui/theme';
+import { CODETHON_VERSION } from './version';
 
 const QUOTES: { text: string; author: string }[] = [
   { text: '"Code is poetry written in logic."', author: '— Unknown' },
@@ -35,7 +36,7 @@ export function showSplash(): string {
   lines.push(`${theme.rgb(theme.colors.primary)}${logo[2]}${theme.reset()}`);
   lines.push(`${theme.rgb(theme.colors.primary)}${logo[3]}${theme.reset()}`);
   lines.push(`${theme.rgb(theme.colors.secondary)}${logo[4]}${theme.reset()}`);
-  lines.push(`  ${theme.bold()}${theme.rgb(theme.colors.accent)}${logo[5]}${theme.reset()}  ${theme.dim()}v1.0.0${theme.reset()}`);
+  lines.push(`  ${theme.bold()}${theme.rgb(theme.colors.accent)}${logo[5]}${theme.reset()}  ${theme.dim()}v${CODETHON_VERSION}${theme.reset()}`);
   lines.push(`  ${theme.dim()}AI-native execution orchestration for planning, building, debugging, and shipping.${theme.reset()}`);
   lines.push('');
   lines.push(`  ${theme.style(text, 'warning')}`);
@@ -50,7 +51,7 @@ export function showMiniSplash(): string {
   const { text, author } = randomQuote();
   const lines: string[] = [];
   lines.push('');
-  lines.push(`  ${theme.bold()}${theme.rgb(theme.colors.primary)}CODETHON CLI${theme.reset()}  ${theme.dim()}v1.0.0${theme.reset()}`);
+  lines.push(`  ${theme.bold()}${theme.rgb(theme.colors.primary)}CODETHON CLI${theme.reset()}  ${theme.dim()}v${CODETHON_VERSION}${theme.reset()}`);
   lines.push(`  ${theme.dim()}AI-native execution orchestration${theme.reset()}`);
   lines.push('');
   lines.push(`  ${theme.style(text, 'warning')}`);

@@ -9,12 +9,14 @@ import {
   Code2,
   Github,
   KeyRound,
+  Menu,
   PackageCheck,
   Radar,
   ShieldCheck,
   Sparkles,
   Terminal,
   Workflow,
+  X,
   Zap,
 } from "lucide-react";
 
@@ -40,19 +42,19 @@ const proofItems = [
 
 const terminalLines = [
   { prompt: "$", text: "ct", tone: "command" },
-  { prompt: "", text: "CodeThon CLI v1.0.0 - interactive builder workspace", tone: "muted" },
-  { prompt: "", text: "AI ready - NVIDIA - deepseek-ai/deepseek-v4-flash", tone: "muted" },
+  { prompt: "", text: "CODETHON CLI · OLED Workspace · AI READY", tone: "active" },
+  { prompt: "", text: "Project: CodeThon-CLI · Provider: NVIDIA · Model: deepseek-v4-flash", tone: "muted" },
   { prompt: ">", text: "/", tone: "command" },
-  { prompt: "", text: "/init               Create or register a project workspace", tone: "strong" },
-  { prompt: "", text: "/plan [goal]        Stream roadmap and architecture", tone: "strong" },
-  { prompt: "", text: "/execute <goal>     Autonomous execution agent", tone: "strong" },
-  { prompt: "", text: "/analyze [dir]      Deep codebase analysis", tone: "strong" },
-  { prompt: "", text: "/profile            Performance and code-smell scan", tone: "strong" },
+  { prompt: "", text: "/execute <goal>     Autonomous OLED workspace", tone: "strong" },
+  { prompt: "", text: "/inspect [runId]    Inspect execution journal", tone: "strong" },
+  { prompt: "", text: "/replay [runId]     Replay event timeline", tone: "strong" },
+  { prompt: "", text: "/graph [dir]        Repository graph view", tone: "strong" },
+  { prompt: "", text: "/memory [query]     Memory explorer", tone: "strong" },
   { prompt: ">", text: "/init", tone: "command" },
   { prompt: "", text: "[ok] Workspace registered. Next: /plan", tone: "success" },
-  { prompt: ">", text: "/plan launch an AI hackathon copilot", tone: "command" },
-  { prompt: "", text: "[stream] Roadmap: MVP scope, phases, risks, demo path", tone: "active" },
-  { prompt: "", text: "[stream] Architecture: app shell, auth, data, agent loop", tone: "active" },
+  { prompt: ">", text: "/execute build auth and add tests", tone: "command" },
+  { prompt: "", text: "[Planner] Visible plan · [Scout] reading files · [QA] running checks", tone: "active" },
+  { prompt: "", text: "[receipt] completed · journal saved · next /inspect /replay /diff", tone: "success" },
 ];
 
 const workflow = [
@@ -194,7 +196,10 @@ const structuredData = {
   featureList: [
     "AI provider onboarding",
     "Slash-command REPL",
-    "Autonomous execution loop",
+    "OLED autonomous workspace",
+    "Execution journal inspection",
+    "Timeline replay",
+    "Repository graph view",
     "Streaming AI output",
     "Codebase analysis",
     "Performance profiling",
@@ -283,6 +288,8 @@ function TerminalPreview() {
 }
 
 export default function Home() {
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
   return (
     <main className="min-h-screen bg-[#000000] text-white">
       <script
@@ -309,16 +316,53 @@ export default function Home() {
               </a>
             ))}
           </div>
-          <a
-            href="https://github.com/zubershk/CodeThon-CLI"
-            target="_blank"
-            rel="noreferrer"
-            className="icon-link"
-          >
-            <Github className="h-4 w-4" />
-            <span className="hidden sm:inline">GitHub</span>
-          </a>
+          <div className="flex items-center gap-2">
+            <a
+              href="https://github.com/zubershk/CodeThon-CLI"
+              target="_blank"
+              rel="noreferrer"
+              className="icon-link hidden sm:inline-flex"
+            >
+              <Github className="h-4 w-4" />
+              <span className="hidden sm:inline">GitHub</span>
+            </a>
+            <button
+              type="button"
+              className="mobile-menu-button md:hidden"
+              aria-label={mobileNavOpen ? "Close navigation" : "Open navigation"}
+              aria-expanded={mobileNavOpen}
+              onClick={() => setMobileNavOpen((open) => !open)}
+            >
+              {mobileNavOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+            </button>
+          </div>
         </nav>
+        {mobileNavOpen ? (
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            className="mobile-nav md:hidden"
+          >
+            {navItems.map((item) => (
+              <a
+                key={item.href}
+                href={item.href}
+                onClick={() => setMobileNavOpen(false)}
+              >
+                {item.label}
+              </a>
+            ))}
+            <a
+              href="https://github.com/zubershk/CodeThon-CLI"
+              target="_blank"
+              rel="noreferrer"
+              onClick={() => setMobileNavOpen(false)}
+            >
+              GitHub
+            </a>
+          </motion.div>
+        ) : null}
       </header>
 
       <section className="hero-oled relative overflow-hidden px-5 pb-16 pt-14 sm:pb-20 sm:pt-20 lg:px-8">

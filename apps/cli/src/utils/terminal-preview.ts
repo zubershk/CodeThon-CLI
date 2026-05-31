@@ -2,6 +2,7 @@ import { spawn } from 'child_process';
 import chalk from 'chalk';
 import readline from 'readline';
 import { sanitizeEnv, resolveBin } from './env';
+import { BLOCKED_PATTERNS } from '../security/policy';
 
 const ALLOWED_COMMANDS = [
   'npm', 'pnpm', 'yarn', 'git', 'node', 'npx', 'next', 'vite', 'tsc', 'eslint', 'prettier',
@@ -10,7 +11,6 @@ const ALLOWED_COMMANDS = [
   'gh', 'tar', 'unzip', 'gzip', 'mkdir', 'cp', 'mv', 'cd', 'touch', 'pwd', 'date', 'whoami',
   'nslookup', 'ping', 'tracert', 'ipconfig', 'systeminfo',
 ];
-const BLOCKED_PATTERNS = [/rm\s+-rf/i, /sudo/i, /curl/i, /wget/i, />\s*\//i, /\|\s*(bash|sh|powershell)/i, /chmod/i, /chown/i, /mkfs/i, /dd\s+if/i, /:\(\)\s*\{/i];
 
 export interface PreviewResult {
   success: boolean;
@@ -32,8 +32,9 @@ export class TerminalPreview {
     this.abortController = new AbortController();
     this.lines = [];
 
-    if (!this.isAllowed(command)) {
-      const msg = `Blocked: ${command.split(/\s+/)[0]} is not in allowed list`;
+    const allowed = this.isAllowed(command);
+    if (!allowed.allowed) {
+      const msg = `Blocked: ${allowed.reason || command.split(/\s+/)[0] + ' is not allowed'}`;
       onLine?.(msg, 'stderr');
       return { success: false, stdout: '', stderr: msg, exitCode: 1 };
     }
@@ -101,37 +102,41 @@ export class TerminalPreview {
     this.abortController?.abort();
   }
 
-  private isAllowed(command: string): boolean {
+  private isAllowed(command: string): { allowed: boolean; reason?: string } {
     const first = command.split(/\s+/)[0];
-    if (!ALLOWED_COMMANDS.includes(first)) return false;
-    for (const p of BLOCKED_PATTERNS) {
-      if (p.test(command)) return false;
+    if (!ALLOWED_COMMANDS.includes(first)) {
+      return { allowed: false, reason: `${first} is not in allowed list` };
     }
-    return true;
+    for (const p of BLOCKED_PATTERNS) {
+      if (p.test(command)) {
+        return { allowed: false, reason: `command matches blocked pattern ${p}` };
+      }
+    }
+    return { allowed: true };
   }
 }
 
 export function renderTerminalBox(title: string): void {
-  const bar = chalk.bold.gray('\u2500'.repeat(50));
-  console.log(`  ${chalk.bold.cyanBright('\u25A3')}  ${chalk.bold.whiteBright(title)}`);
+  const bar = chalk.hex('#899691').bold('\u2500'.repeat(50));
+  console.log(`  ${chalk.hex('#74d7ff').bold('\u25A3')}  ${chalk.hex('#f7fff9').bold(title)}`);
   console.log(`  ${bar}`);
-  console.log(`  ${chalk.dim('\u2503')}`);
+  console.log(`  ${chalk.hex('#899691')('\u2503')}`);
 }
 
 export function renderTerminalLine(line: string, stream: 'stdout' | 'stderr'): void {
   if (stream === 'stderr') {
-    console.log(`  ${chalk.dim('\u2503')} ${chalk.redBright(line)}`);
+    console.log(`  ${chalk.hex('#899691')('\u2503')} ${chalk.hex('#ff5c7a')(line)}`);
   } else {
-    console.log(`  ${chalk.dim('\u2503')} ${chalk.whiteBright(line)}`);
+    console.log(`  ${chalk.hex('#899691')('\u2503')} ${chalk.hex('#f7fff9')(line)}`);
   }
 }
 
 export function renderTerminalClose(result: PreviewResult): void {
-  const bar = chalk.bold.gray('\u2500'.repeat(50));
+  const bar = chalk.hex('#899691').bold('\u2500'.repeat(50));
   const status = result.success
-    ? chalk.greenBright(`\u2713 Exited with code ${result.exitCode}`)
-    : chalk.redBright(`\u2717 Exited with code ${result.exitCode ?? 'TIMEOUT'}`);
-  console.log(`  ${chalk.dim('\u2503')}`);
+    ? chalk.hex('#82f7a6')(`\u2713 Exited with code ${result.exitCode}`)
+    : chalk.hex('#ff5c7a')(`\u2717 Exited with code ${result.exitCode ?? 'TIMEOUT'}`);
+  console.log(`  ${chalk.hex('#899691')('\u2503')}`);
   console.log(`  ${status}`);
   console.log(`  ${bar}`);
   console.log('');

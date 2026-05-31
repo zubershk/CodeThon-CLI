@@ -10,7 +10,7 @@ export class StateManager {
   getProjectOrThrow(): ProjectState {
     const project = loadProject();
     if (!project) {
-      throw new Error('No active project. Run `ct init` first.');
+      throw new Error('No active project. Run `/init` inside ct, or `ct init` from your shell.');
     }
     return project;
   }
@@ -26,7 +26,7 @@ export class StateManager {
     const oldPhase = project.sprintPhase;
     Object.assign(project, updates);
     if (updates.sprintPhase && updates.sprintPhase !== oldPhase) {
-      this.emitEvent(project, 'sprint_phase_changed', `Phase: ${oldPhase} → ${updates.sprintPhase}`, {
+      this.emitEvent(project, 'sprint_phase_changed', `Phase: ${oldPhase} -> ${updates.sprintPhase}`, {
         from: oldPhase,
         to: updates.sprintPhase,
       });
@@ -40,7 +40,7 @@ export class StateManager {
     const old = project.sprintPhase;
     if (old !== phase) {
       updateSprintPhase(phase);
-      this.emitEvent(project, 'sprint_phase_changed', `Phase: ${old} → ${phase}`, { from: old, to: phase });
+      this.emitEvent(project, 'sprint_phase_changed', `Phase: ${old} -> ${phase}`, { from: old, to: phase });
       project.sprintPhase = phase;
       saveProject(project);
     }
@@ -99,7 +99,7 @@ export class StateManager {
       score: { ...project.healthScore },
     });
     if (project.healthScore.overall !== oldScore.overall) {
-      this.emitEvent(project, 'health_recalculated', `Health: ${oldScore.overall} → ${project.healthScore.overall}`, {
+      this.emitEvent(project, 'health_recalculated', `Health: ${oldScore.overall} -> ${project.healthScore.overall}`, {
         from: oldScore.overall,
         to: project.healthScore.overall,
       });

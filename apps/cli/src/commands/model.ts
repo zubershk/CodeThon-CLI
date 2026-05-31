@@ -25,9 +25,9 @@ function formatModelEntry(m: ModelInfo): string {
     : m.contextWindow >= 1000
       ? `${(m.contextWindow / 1000).toFixed(0)}K`
       : `${m.contextWindow}`;
-  const badge = m.recommended ? chalk.bgGreen.black(' BEST ') : '';
-  const price = m.pricing === 'Free' ? chalk.green('Free') : chalk.dim(m.pricing);
-  return `${chalk.bold(m.name)}  ${chalk.dim(`${ctxLabel} ctx`)}  ${price} ${badge}`;
+  const badge = m.recommended ? chalk.bgHex('#82f7a6').hex('#00110b')(' BEST ') : '';
+  const price = m.pricing === 'Free' ? chalk.hex('#82f7a6')('Free') : chalk.hex('#899691')(m.pricing);
+  return `${chalk.hex('#f7fff9').bold(m.name)}  ${chalk.hex('#899691')(`${ctxLabel} ctx`)}  ${price} ${badge}`;
 }
 
 export async function modelCommand(): Promise<CommandResult> {
@@ -45,8 +45,8 @@ export async function modelCommand(): Promise<CommandResult> {
   for (const p of providers) {
     const label = PROVIDER_LABELS[p] || p;
     const hasKey = hasProviderCredential(p);
-    const keyIcon = hasKey ? chalk.green('\u2713') : chalk.dim('\u25CB');
-    modelChoices.push({ separator: chalk.magenta(`${keyIcon} ${label}`) });
+    const keyIcon = hasKey ? chalk.hex('#82f7a6')('\u2713') : chalk.hex('#899691')('\u25CB');
+    modelChoices.push({ separator: chalk.hex('#d7a3ff')(`${keyIcon} ${label}`) });
     const models = AVAILABLE_MODELS.filter(m => m.provider === p);
     for (const m of models) {
       modelChoices.push({ name: `  ${formatModelEntry(m)}`, value: m.id });
@@ -68,7 +68,7 @@ export async function modelCommand(): Promise<CommandResult> {
   const setup = PROVIDER_SETUP[provider];
   if (setup?.envVar && !process.env[setup.envVar]) {
     logger.warn(`${getProviderDisplayName(provider)} is not configured yet.`);
-    logger.info(`Run ${chalk.cyanBright('ct auth add')} to save ${chalk.yellowBright(setup.envVar)} before using this model.`);
+    logger.info(`Run ${chalk.hex('#74d7ff')('ct auth add')} to save ${chalk.hex('#ffcf5c')(setup.envVar)} before using this model.`);
     const switchAnyway = await promptConfirm({
       message: 'Switch to this model anyway?',
       defaultValue: false,
@@ -86,15 +86,15 @@ export async function modelCommand(): Promise<CommandResult> {
   });
 
   logger.section('Model Updated');
-  logger.labelValue('Model', `${chalk.bold(modelInfo.name)}`);
+  logger.labelValue('Model', `${chalk.hex('#f7fff9').bold(modelInfo.name)}`);
   logger.labelValue('Provider', getProviderDisplayName(provider));
   logger.labelValue('Context', `${formatContextWindow(modelInfo.contextWindow)} tokens`);
   logger.labelValue('Max Output', `${(modelInfo.maxOutput / 1024).toFixed(1)}K tokens`);
-  logger.labelValue('Pricing', modelInfo.pricing === 'Free' ? chalk.green('Free') : modelInfo.pricing);
+  logger.labelValue('Pricing', modelInfo.pricing === 'Free' ? chalk.hex('#82f7a6')('Free') : modelInfo.pricing);
 
   if (setup?.envVar && !process.env[setup.envVar]) {
     logger.divider();
-    logger.info(`  ${chalk.dim('Note:')} Set ${chalk.yellowBright(setup.envVar)} in your environment or run ${chalk.cyanBright('ct auth add')}.`);
+    logger.info(`  ${chalk.hex('#899691')('Note:')} Set ${chalk.hex('#ffcf5c')(setup.envVar)} in your environment or run ${chalk.hex('#74d7ff')('ct auth add')}.`);
   }
 
   printActionHints('Suggested next actions', [

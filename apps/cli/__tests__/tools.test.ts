@@ -83,6 +83,44 @@ describe('ToolExecutor - write operations', () => {
     });
     expect(result.error).toContain('escapes project root');
   });
+
+  it('should reject sibling-prefix path traversal', async () => {
+    const baseDir = path.join(os.tmpdir(), 'codethon-prefix-bypass-' + Date.now());
+    const projectDir = path.join(baseDir, 'project');
+    const siblingDir = path.join(baseDir, 'project-evil');
+    fs.mkdirSync(projectDir, { recursive: true });
+    fs.mkdirSync(siblingDir, { recursive: true });
+    fs.writeFileSync(path.join(siblingDir, 'secret.txt'), 'secret');
+
+    const siblingExecutor = new ToolExecutor(projectDir);
+    const result = await siblingExecutor.execute({
+      id: '1',
+      tool: 'read_file',
+      args: { path: '../project-evil/secret.txt' },
+    });
+
+    expect(result.error).toContain('escapes project root');
+    fs.rmSync(baseDir, { recursive: true, force: true });
+  });
+});
+
+describe('ToolExecutor - malformed model arguments', () => {
+  let executor: ToolExecutor;
+
+  beforeEach(() => {
+    if (!fs.existsSync(TEST_DIR)) fs.mkdirSync(TEST_DIR, { recursive: true });
+    executor = new ToolExecutor(TEST_DIR);
+  });
+
+  it('should return a clear read_file error instead of throwing for missing paths', async () => {
+    const result = await executor.execute({
+      id: '1', tool: 'read_file',
+      args: { paths: [undefined] },
+    });
+
+    expect(result.output).toBe('');
+    expect(result.error).toContain('read_file needs a file path');
+  });
 });
 
 describe('ToolExecutor - run command validation', () => {
@@ -113,6 +151,14 @@ describe('ToolExecutor - run command validation', () => {
     const result = await executor.execute({
       id: '1', tool: 'run_command',
       args: { command: 'git push origin main --force && rm -rf /' },
+    });
+    expect(result.error).toContain('blocked');
+  });
+
+  it('should block shell-control operators for allowed commands', async () => {
+    const result = await executor.execute({
+      id: '1', tool: 'run_command',
+      args: { command: 'npm run build && whoami' },
     });
     expect(result.error).toContain('blocked');
   });

@@ -128,7 +128,7 @@ export async function onboardCommand(reset?: boolean): Promise<CommandResult> {
     resetConfig();
     logger.success('Configuration reset.');
     if (process.stdin.isTTY && process.stdout.isTTY) {
-      logger.info(`  ${chalk.dim('Restarting guided setup...')}`);
+      logger.info(`  ${chalk.hex('#899691')('Restarting guided setup...')}`);
       console.log('');
       return onboardCommand(false);
     }
@@ -188,12 +188,12 @@ export async function onboardCommand(reset?: boolean): Promise<CommandResult> {
         })).trim();
       }
 
-      logger.info(`\n  ${chalk.dim('Validating API key...')}`);
+      logger.info(`\n  ${chalk.hex('#899691')('Validating API key...')}`);
       validationError = await validateApiKey(provider, apiKey);
 
       if (validationError) {
         logger.error(`  ${validationError}`);
-        logger.info(chalk.dim(`  Get a key: ${setup.url}`));
+        logger.info(chalk.hex('#899691')(`  Get a key: ${setup.url}`));
         console.log('');
         apiKey = '';
         const retry = await promptConfirm({
@@ -222,11 +222,11 @@ export async function onboardCommand(reset?: boolean): Promise<CommandResult> {
   console.log('');
   const modelChoices = models.map(m => {
     const ctx = formatContextWindow(m.contextWindow);
-    const price = m.pricing === 'Free' ? chalk.green('Free') : chalk.dim(m.pricing);
-    const badge = m.recommended ? chalk.bgGreen.black(' BEST ') : '';
-    const name = m.recommended ? chalk.bold(m.name) : m.name;
+    const price = m.pricing === 'Free' ? chalk.hex('#82f7a6')('Free') : chalk.hex('#899691')(m.pricing);
+    const badge = m.recommended ? chalk.bgHex('#82f7a6').hex('#00110b')(' BEST ') : '';
+    const name = m.recommended ? chalk.hex('#f7fff9').bold(m.name) : chalk.hex('#e0e6e1')(m.name);
     return {
-      name: `  ${name}  ${chalk.dim(`${ctx} ctx`)}  ${price} ${badge}`,
+      name: `  ${name}  ${chalk.hex('#899691')(`${ctx} ctx`)}  ${price} ${badge}`,
       value: m.id,
       short: m.name,
     };
@@ -257,7 +257,7 @@ export async function onboardCommand(reset?: boolean): Promise<CommandResult> {
 
   // Step 5: Run test request
   console.log('');
-  logger.info(`  ${chalk.dim('Running test request...')}`);
+  logger.info(`  ${chalk.hex('#899691')('Running test request...')}`);
   try {
     const { createProvider } = await import('../llm/providers/index');
     const llm = getLLMConfig();
@@ -275,7 +275,7 @@ export async function onboardCommand(reset?: boolean): Promise<CommandResult> {
     });
     if (res.content) {
       logger.success('  Model verified');
-      console.log(`    ${chalk.dim(res.content.slice(0, 100))}`);
+      console.log(`    ${chalk.hex('#899691')(res.content.slice(0, 100))}`);
     }
   } catch {
     logger.warn('  Test request failed. Your config is saved, but check connectivity.');
@@ -298,7 +298,7 @@ export async function onboardCommand(reset?: boolean): Promise<CommandResult> {
     { command: 'doctor', description: 'Run diagnostics if you want a full health check before starting.' },
   ], '/');
   console.log('');
-  logger.info(`  ${chalk.dim('You can reopen the interactive REPL anytime with')} ${chalk.cyanBright('ct')}${chalk.dim('.')}`);
+  logger.info(`  ${chalk.hex('#899691')('You can reopen the interactive REPL anytime with')} ${chalk.hex('#74d7ff')('ct')}${chalk.hex('#899691')('.')}`);
 
   return { success: true, message: 'Onboarding complete' };
 }
