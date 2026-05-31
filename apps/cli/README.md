@@ -7,7 +7,7 @@ npm install -g codethon-cli
 ct
 ```
 
-Current package: `codethon-cli@1.0.0`
+Current package: `codethon-cli@1.1.0`
 
 ## First Run
 
@@ -23,6 +23,21 @@ If no working provider is configured, CodeThon starts guided setup:
 6. Save config and show next actions.
 
 CodeThon stores configuration in the user's home directory, not inside the npm package folder and not inside your source tree.
+
+## Terminal UI
+
+CodeThon uses solid terminal icons instead of emoji. The symbols are designed to
+stay aligned in PowerShell, Windows Terminal, macOS Terminal, Linux terminals,
+and CI logs.
+
+| Icon | Meaning |
+|---|---|
+| `◆` | Completed successfully |
+| `▲` | Warning or user attention needed |
+| `■` | Failed or blocked |
+| `●` | Active work |
+| `▣` | Queued, checkpoint, or captured state |
+| `▶` | Running or starting an action |
 
 ## Interactive Mode
 
@@ -51,6 +66,21 @@ builder workflow is `/init`, `/plan`, `/execute`, `/analyze`, and `/profile`.
 /profile
 /doctor
 ```
+
+## Execute Workspace Controls
+
+`/execute <goal>` opens the OLED autonomous workspace. It keeps the mission,
+live trace, context, diffs, agents, and final receipt inside one terminal screen.
+
+| Key | Action |
+|---|---|
+| `Ctrl+M` | Open Mission Control |
+| `Ctrl+T` | Open the live activity trace |
+| `Ctrl+I` | Open Context Inspector |
+| `Ctrl+D` | Open Diff Inspector |
+| `Ctrl+A` | Open the agent matrix |
+| `Esc` | Close the active drawer; if no drawer is open, cancel the active run |
+| `Ctrl+C` | Gracefully cancel the active run; press again only if it is stuck |
 
 ## Commands
 

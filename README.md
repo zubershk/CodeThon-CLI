@@ -7,7 +7,7 @@ npm install -g codethon-cli
 ct
 ```
 
-Current package: `codethon-cli@1.0.0`
+Current package: `codethon-cli@1.1.0`
 
 ## What It Is
 
@@ -24,6 +24,21 @@ It can:
 - run an autonomous execution loop with guarded tools
 - recover context from local project files
 - generate launch, README, deployment, and startup material
+
+## Terminal UI
+
+CodeThon uses solid terminal icons instead of emoji. The symbols are designed to
+stay aligned in PowerShell, Windows Terminal, macOS Terminal, Linux terminals,
+and CI logs.
+
+| Icon | Meaning |
+|---|---|
+| `◆` | Completed successfully |
+| `▲` | Warning or user attention needed |
+| `■` | Failed or blocked |
+| `●` | Active work |
+| `▣` | Queued, checkpoint, or captured state |
+| `▶` | Running or starting an action |
 
 ## Install
 
@@ -110,6 +125,21 @@ CodeThon > /
 /doctor
 /review
 ```
+
+## Execute Workspace Controls
+
+`/execute <goal>` opens the OLED autonomous workspace. It keeps the mission,
+live trace, context, diffs, agents, and final receipt inside one terminal screen.
+
+| Key | Action |
+|---|---|
+| `Ctrl+M` | Open Mission Control |
+| `Ctrl+T` | Open the live activity trace |
+| `Ctrl+I` | Open Context Inspector |
+| `Ctrl+D` | Open Diff Inspector |
+| `Ctrl+A` | Open the agent matrix |
+| `Esc` | Close the active drawer; if no drawer is open, cancel the active run |
+| `Ctrl+C` | Gracefully cancel the active run; press again only if it is stuck |
 
 ## Core Commands
 
